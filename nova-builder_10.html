@@ -1,0 +1,2934 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Nova — Web Builder</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Sora:wght@400;600;700;800&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+<link rel="stylesheet" href="https://unpkg.com/grapesjs@0.23.4/dist/css/grapes.min.css">
+<style>
+  :root{
+    --nv-bg: #252526;
+    --nv-panel: #1c1e26;
+    --nv-panel-2: #22242e;
+    --nv-border: #2c2f3a;
+    --nv-text: #e6e7ec;
+    --nv-text-dim: #8b8d9a;
+    --nv-accent: #6e5bff;
+    --nv-accent-2: #22c3a6;
+    --nv-danger: #ff5d6c;
+    --nv-local: #ff5ca8;
+    --nv-radius: 12px;
+    font-family: 'Inter', sans-serif;
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;height:100%;background:var(--nv-bg);color:var(--nv-text);overflow:hidden;}
+  button{font-family:inherit;}
+  /* Safety net: any text/number/search input or select in the app UI (not the
+     canvas iframe) defaults to dark, unless a more specific rule overrides it. */
+  #app input[type=text], #app input[type=number], #app input[type=search], #app select{
+    background:var(--nv-panel-2); color:var(--nv-text); border:1px solid var(--nv-border);
+  }
+  #app input::placeholder{ color:var(--nv-text-dim); opacity:.8; }
+  #app select option{ background:var(--nv-panel-2); color:var(--nv-text); }
+
+  /* ---------- App shell ---------- */
+  #app{display:flex;flex-direction:row;height:100vh;width:100vw;}
+
+  #page-shell{flex:1;display:flex;flex-direction:column;min-width:0;height:100%;overflow:hidden;}
+
+  .tb-group{display:flex;align-items:center;gap:6px;}
+  .tb-btn{
+    background:transparent;border:1px solid transparent;color:var(--nv-text-dim);width:34px;height:34px;border-radius:var(--nv-radius);
+    display:flex;align-items:center;justify-content:center;cursor:pointer;font-size:14px;transition:.15s;
+  }
+  .tb-btn:hover{background:var(--nv-panel-2);color:var(--nv-text);}
+  .tb-btn.active{background:var(--nv-accent);color:#fff;}
+  .tb-sep{width:1px;height:24px;background:var(--nv-border);margin:0 8px;}
+  .tb-btn-wide{width:auto;padding:0 12px;gap:6px;font-size:13px;font-weight:600;}
+  .tb-primary{background:var(--nv-accent);color:#fff;}
+  .tb-primary:hover{background:#5c4ce6;color:#fff;}
+  .tb-status{font-size:12px;color:var(--nv-text-dim);display:flex;align-items:center;gap:6px;}
+  .tb-status .pulse{width:7px;height:7px;border-radius:50%;background:var(--nv-accent-2);}
+
+  /* ---------- Pages ---------- */
+  .page{flex:1;min-height:0;display:none;flex-direction:column;overflow:hidden;}
+  .page.active{display:flex;}
+
+  .page-head{padding:22px 32px 6px;flex-shrink:0;}
+  .page-head h2{margin:0 0 4px;font-family:'Sora',sans-serif;font-size:20px;display:flex;align-items:center;gap:10px;}
+  .page-head p{margin:0;color:var(--nv-text-dim);font-size:13px;}
+  .page-body{flex:1;overflow-y:auto;padding:10px 32px 40px;}
+
+  /* ---------- Design page ---------- */
+  #design-toolbar{
+    height:48px;min-height:48px;display:flex;align-items:center;justify-content:space-between;
+    background:var(--nv-panel);border-bottom:1px solid var(--nv-border);padding:0 10px;flex-shrink:0;
+  }
+  #main{flex:1;display:flex;min-height:0;width:100%;position:relative;overflow:hidden;}
+
+  /* ---------- Icon rail: now a persistent, global sidebar (outside .page),
+     so it stays visible and can host page navigation regardless of which
+     page is active ---------- */
+  #icon-rail{
+    width:52px;min-width:52px;background:var(--nv-panel);border-right:1px solid var(--nv-border);
+    display:flex;flex-direction:column;align-items:center;padding:10px 0;gap:4px;height:100%;flex-shrink:0;
+  }
+  #icon-rail .rail-btn{
+    width:36px;height:36px;border-radius:8px;display:flex;align-items:center;justify-content:center;
+    color:var(--nv-text-dim);cursor:pointer;font-size:15px;transition:.15s;
+  }
+  #icon-rail .rail-btn:hover{background:var(--nv-panel-2);color:var(--nv-text);}
+  #icon-rail .rail-btn.active{background:var(--nv-accent);color:#fff;}
+
+  .rail-group-top{display:flex;flex-direction:column;align-items:center;gap:4px;}
+  .rail-spacer{flex:1;}
+  .rail-group-pages{
+    display:flex;flex-direction:column;align-items:center;gap:4px;
+    background:var(--nv-panel-2);border:1px solid var(--nv-border);border-radius:14px;padding:5px;
+  }
+  .rail-page-btn{
+    width:34px;height:34px;border-radius:9px;display:flex;align-items:center;justify-content:center;
+    color:var(--nv-text-dim);cursor:pointer;font-size:14px;transition:.15s;
+  }
+  .rail-page-btn:hover{color:var(--nv-text);}
+  .rail-page-btn.active{background:var(--nv-accent);color:#fff;}
+
+  /* Single side panel: part of the normal flex row (not an overlay), so it
+     pushes the canvas rather than covering it. Canvas keeps ~75-80% of the
+     screen whenever the panel is open, and 100% when collapsed. */
+  .side{
+    flex:0 0 260px;
+    width:260px;
+    background:var(--nv-panel);border-right:1px solid var(--nv-border);
+    display:flex;flex-direction:column;overflow:hidden;
+    position:relative;
+    transition:flex-basis .15s ease, width .15s ease;
+  }
+  .side.collapsed{display:none;}
+  .side.nv-resizing{transition:none;}
+  .side-resize-handle{
+    position:absolute;top:0;right:-3px;bottom:0;width:6px;cursor:col-resize;z-index:5;
+  }
+  .side-resize-handle:hover{background:rgba(110,91,255,.25);}
+  .drawer-close{
+    position:absolute;top:8px;right:8px;z-index:2;width:28px;height:28px;border-radius:8px;border:none;
+    background:var(--nv-panel-2);color:var(--nv-text-dim);cursor:pointer;display:flex;align-items:center;justify-content:center;
+  }
+  .drawer-close:hover{color:var(--nv-text);}
+  .burger-btn.active{background:var(--nv-accent);color:#fff;}
+
+  /* Tab strips */
+  .side-tabs{display:flex;border-bottom:1px solid var(--nv-border);padding-right:34px;}
+  .side-tab{flex:1;padding:11px 4px;text-align:center;font-size:11px;font-weight:600;color:var(--nv-text-dim);cursor:pointer;border-bottom:2px solid transparent;letter-spacing:.2px;}
+  .side-tab.active{color:var(--nv-text);border-bottom-color:var(--nv-accent);}
+  .side-pane{flex:1;overflow:hidden;display:none;flex-direction:column;min-height:0;}
+  .side-pane.active{display:flex;}
+
+  .right-tabs{display:flex;border-bottom:1px solid var(--nv-border);padding-right:34px;}
+  .right-tab{flex:1;padding:11px 4px;text-align:center;font-size:12px;font-weight:600;color:var(--nv-text-dim);cursor:pointer;border-bottom:2px solid transparent;letter-spacing:.2px;}
+  .right-tab.active{color:var(--nv-text);border-bottom-color:var(--nv-accent);}
+  .right-pane{flex:1;overflow:hidden;display:none;flex-direction:column;min-height:0;}
+  .right-pane.active{display:flex;}
+
+  #canvas-wrap{
+    flex:1 1 auto;
+    min-width:0;width:100%;
+    background:#0e0f13;position:relative;display:flex;flex-direction:column;align-items:center;
+  }
+  #canvas-scroll{flex:1;width:100%;overflow:auto;display:flex;justify-content:center;}
+  #gjs{flex:1;border:none;width:100%;}
+  .gjs-cv-canvas{width:100%!important;}
+
+  #library-pick-banner{
+    display:none;width:100%;flex-shrink:0;align-items:center;justify-content:center;gap:16px;
+    background:var(--nv-accent);color:#fff;padding:9px 14px;font-size:13px;font-weight:600;
+  }
+  #library-pick-banner.show{display:flex;}
+  #library-pick-banner button{background:rgba(255,255,255,.18);border:none;color:#fff;padding:5px 12px;border-radius:8px;cursor:pointer;font-weight:600;font-size:12px;}
+  #library-pick-banner button:hover{background:rgba(255,255,255,.3);}
+
+  /* ---------- Theme / Project pages ---------- */
+  #page-theme-inner{max-width:640px;}
+  .proj-card{
+    background:var(--nv-panel);border:1px solid var(--nv-border);border-radius:var(--nv-radius);
+    padding:18px 20px;margin-bottom:16px;max-width:640px;
+  }
+  .proj-card h3{margin:0 0 12px;font-size:14px;font-family:'Sora',sans-serif;}
+  .proj-hint{margin:0 0 12px;color:var(--nv-text-dim);font-size:12.5px;}
+  .proj-row{display:flex;align-items:center;gap:10px;flex-wrap:wrap;}
+  .btn{
+    background:var(--nv-panel-2);border:1px solid var(--nv-border);color:var(--nv-text);
+    padding:9px 14px;border-radius:10px;font-size:13px;font-weight:600;cursor:pointer;display:flex;align-items:center;gap:8px;transition:.15s;
+  }
+  .btn:hover{border-color:var(--nv-accent);}
+  .btn.primary{background:var(--nv-accent);border-color:var(--nv-accent);color:#fff;}
+  .btn.primary:hover{background:#5c4ce6;}
+  .btn.danger{color:var(--nv-danger);}
+  .btn.danger:hover{border-color:var(--nv-danger);}
+  #project-select{
+    background:var(--nv-panel-2);border:1px solid var(--nv-border);color:var(--nv-text);
+    padding:9px 12px;border-radius:10px;font-size:13px;min-width:220px;
+  }
+
+  /* ---------- Media Library page ---------- */
+  #page-library-inner{max-width:900px;}
+  #page-library .assets-head{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:6px;flex-wrap:wrap;}
+  #page-library #assets-search-wrap{flex:1;min-width:200px;padding:0;border-bottom:none;}
+  #page-library #assets-search-wrap input{
+    width:100%;background:var(--nv-panel-2);border:1px solid var(--nv-border);color:var(--nv-text);
+    border-radius:10px;padding:9px 12px;font-size:13px;outline:none;
+  }
+  #assets-status{display:block;font-size:12px;color:var(--nv-text-dim);min-height:16px;margin-bottom:10px;}
+  #page-library #assets-container{padding:0;overflow:visible;display:grid!important;grid-template-columns:repeat(auto-fill,minmax(160px,1fr))!important;gap:14px;}
+  #page-library .nv-asset-thumb{height:130px;}
+  .gjs-cv-canvas__frames{margin:0 auto!important;}
+
+  /* device & project dropdowns */
+  .device-select, .project-select{
+    background:var(--nv-panel-2);border:1px solid var(--nv-border);color:var(--nv-text);
+    border-radius:6px;padding:7px 10px;font-size:12.5px;font-weight:600;outline:none;cursor:pointer;
+  }
+  .device-select:focus, .project-select:focus{border-color:var(--nv-accent);}
+  .project-select { max-width: 170px; text-overflow: ellipsis; white-space: nowrap; }
+
+  .search-wrap{padding:10px;border-bottom:1px solid var(--nv-border);}
+  .search-wrap input{
+    width:100%;background:var(--nv-panel-2);border:1px solid var(--nv-border);color:var(--nv-text);
+    border-radius:6px;padding:8px 10px;font-size:13px;outline:none;
+  }
+  .search-wrap input:focus{border-color:var(--nv-accent);}
+
+  #blocks-container{flex:1;overflow-y:auto;padding:6px 10px 20px;}
+  #layers-container{flex:1;overflow-y:auto;padding:8px;}
+  #styles-container{flex:1 1 auto;overflow-y:auto;min-height:0;}
+  #traits-container{flex:1;overflow-y:auto;padding:12px;min-height:0;}
+  #selectors-container{border-bottom:1px solid var(--nv-border);padding:8px 10px 10px;position:relative;}
+  #pane-style{overflow:hidden;min-height:0;}
+  #style-header{flex-shrink:0;}
+
+  /* ---- Custom class manager (replaces GrapesJS's built-in selector UI,
+     since we drive it entirely through the public Component API) ---- */
+  .nv-cls-empty{font-size:11.5px;color:var(--nv-text-dim);padding:2px 0;}
+  .nv-cls-chips{display:flex;flex-wrap:wrap;gap:5px;margin-bottom:6px;}
+  .nv-cls-chip{
+    display:inline-flex;align-items:center;gap:5px;background:var(--nv-panel-2);border:1px solid var(--nv-border);
+    color:var(--nv-text);font-size:11px;padding:3px 4px 3px 8px;border-radius:8px;
+  }
+  .nv-cls-chip button{background:transparent;border:none;color:var(--nv-text-dim);cursor:pointer;width:16px;height:16px;display:flex;align-items:center;justify-content:center;font-size:10px;}
+  .nv-cls-chip button:hover{color:var(--nv-danger);}
+  .nv-cls-none{font-size:11px;color:var(--nv-text-dim);}
+  .nv-cls-input-row input{
+    width:100%;background:var(--nv-panel-2);border:1px solid var(--nv-border);color:var(--nv-text);
+    border-radius:8px;padding:6px 8px;font-size:11.5px;outline:none;
+  }
+  .nv-cls-input-row input:focus{border-color:var(--nv-accent);}
+  .nv-cls-dropdown{
+    display:none;position:absolute;left:10px;right:10px;top:100%;margin-top:2px;
+    background:var(--nv-panel-2);border:1px solid var(--nv-border);border-radius:8px;
+    max-height:180px;overflow-y:auto;z-index:20;box-shadow:0 8px 20px rgba(0,0,0,.35);
+  }
+  .nv-cls-dropdown.show{display:block;}
+  .nv-cls-dd-item{padding:6px 10px;font-size:11.5px;cursor:pointer;color:var(--nv-text);}
+  .nv-cls-dd-item:hover{background:var(--nv-accent);color:#fff;}
+  .nv-cls-hint{font-size:10.5px;color:var(--nv-text-dim);margin-top:6px;}
+
+
+  .gjs-block-category .gjs-title{background:transparent!important;color:var(--nv-text-dim)!important;font-size:11px!important;text-transform:uppercase;letter-spacing:.06em;font-weight:700;padding:10px 4px 6px!important;}
+  .gjs-block-category{border:none!important;}
+  .gjs-blocks-c{display:grid;grid-template-columns:1fr 1fr;gap:8px;padding:4px 2px;}
+  .gjs-block{
+    width:auto!important;height:74px!important;min-height:74px;background:var(--nv-bg)!important;border:1px solid var(--nv-border)!important;
+    border-radius:8px!important;color:var(--nv-text)!important;display:flex!important;flex-direction:column;align-items:center;justify-content:center;gap:6px;
+    font-size:11px!important;padding:6px!important;transition:.15s;
+  }
+  .gjs-block:hover{border-color:var(--nv-accent)!important;transform:translateY(-1px);background:#272a36!important;}
+  .gjs-block .gjs-block-label{font-size:11px!important;color:var(--nv-text-dim)!important; text-align:center;}
+  .gjs-block i{font-size:18px;color:var(--nv-accent-2);}
+  .gjs-block svg{width:22px;height:22px;fill:var(--nv-accent-2);}
+
+  .gjs-editor { background: transparent !important; }
+  .gjs-cv-canvas{background:#0e0f13!important;top:0!important;}
+  
+  .gjs-one-bg { background-color: var(--nv-panel) !important; }
+  .gjs-two-bg { background-color: var(--nv-panel-2) !important; }
+  .gjs-three-bg { background-color: var(--nv-accent) !important; }
+  .gjs-four-color, .gjs-four-color-h:hover { color: var(--nv-accent-2) !important; }
+
+  /* Style manager — legacy field look reused by a few remaining native inputs (selects, text inputs) */
+  .gjs-field{background:var(--nv-panel-2)!important;border:1px solid var(--nv-border)!important;color:var(--nv-text)!important;border-radius:8px!important;min-height:26px!important;}
+  .gjs-field input, .gjs-field select{font-size:11.5px!important;padding:4px 6px!important;color:var(--nv-text)!important;}
+  .gjs-radio-item label, .gjs-select select{color:var(--nv-text)!important;}
+
+  /* layers */
+  .gjs-layer{color:var(--nv-text)!important;border-color:var(--nv-border)!important;}
+  .gjs-layer-title{background:transparent!important;}
+  .gjs-layer-count{background:var(--nv-panel-2)!important;}
+  .gjs-layer.gjs-selected > .gjs-layer-item, .gjs-layer.gjs-selected{background:rgba(110,91,255,.14)!important;}
+
+  /* traits */
+  .gjs-trt-trait{margin-bottom:10px;}
+  .gjs-trt-trait .gjs-label{color:var(--nv-text-dim);font-size:11.5px;display:block;margin-bottom:4px;}
+  .gjs-trt-trait input, .gjs-trt-trait select, .gjs-trt-trait textarea{
+    width:100%;background:var(--nv-panel-2);border:1px solid var(--nv-border);color:var(--nv-text);border-radius:5px;padding:6px 8px;font-size:12.5px;
+  }
+  .traits-heading{font-size:11px;text-transform:uppercase;letter-spacing:.06em;color:var(--nv-text-dim);font-weight:700;padding:12px 12px 6px;}
+
+  /* selected component badge */
+  .comp-badge{display:flex;align-items:center;gap:6px;padding:8px 10px;border-bottom:1px solid var(--nv-border);}
+  .comp-badge .ic{width:22px;height:22px;border-radius:8px;background:var(--nv-accent);color:#fff;display:flex;align-items:center;justify-content:center;font-size:10px;flex-shrink:0;}
+  .comp-badge .nm{font-size:11px;font-weight:700;background:var(--nv-accent);color:#fff;padding:2px 7px;border-radius:8px;display:inline-block;}
+  .comp-badge .id{font-size:10px;color:var(--nv-text-dim);margin-top:1px;}
+
+  /* quick actions */
+  #style-header{border-bottom:1px solid var(--nv-border);}
+  .quick-actions{display:flex;border-top:1px solid var(--nv-border);}
+  .qa-btn{flex:1;padding:6px 0;text-align:center;color:var(--nv-text-dim);cursor:pointer;font-size:11.5px;border-right:1px solid var(--nv-border);transition:.15s;}
+  .qa-btn:last-child{border-right:none;}
+  .qa-btn:hover{color:var(--nv-text);background:var(--nv-panel-2);}
+
+  /* ---------- Global styles panel ---------- */
+  #globalstyles-container{padding:0;overflow-y:auto;flex:1;min-height:0;}
+  .gs-section{border-bottom:1px solid var(--nv-border);}
+  .gs-section-head{display:flex;align-items:center;justify-content:space-between;padding:12px 14px;cursor:pointer;user-select:none;}
+  .gs-section-head:hover{background:var(--nv-panel-2);}
+  .gs-section-head .gs-title{font-size:12px;font-weight:700;color:var(--nv-text);letter-spacing:.02em;}
+  .gs-section-head .gs-chev{color:var(--nv-text-dim);font-size:11px;transition:.15s;}
+  .gs-section.collapsed .gs-chev{transform:rotate(-90deg);}
+  .gs-section.collapsed .gs-body{display:none;}
+  .gs-body{padding:4px 14px 14px;}
+  .gs-row{display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;gap:8px;}
+  .gs-row:last-child{margin-bottom:0;}
+  .gs-row label{font-size:12.5px;color:var(--nv-text);flex-shrink:0;}
+  .gs-row .gs-field{display:flex;align-items:center;gap:6px;min-width:0;}
+  .gs-row input[type=color]{width:28px;height:28px;border:1px solid var(--nv-border);border-radius:8px;background:var(--nv-panel-2);cursor:pointer;padding:2px;flex-shrink:0;}
+  .gs-row input[type=text], .gs-row input[type=number]{background:var(--nv-panel-2);border:1px solid var(--nv-border);color:var(--nv-text);border-radius:8px;padding:6px 8px;font-size:12px;outline:none;width:110px;}
+  .gs-row input[type=text]:focus, .gs-row input[type=number]:focus, .gs-row select:focus{border-color:var(--nv-accent);}
+  .gs-row select{background:var(--nv-panel-2);border:1px solid var(--nv-border);color:var(--nv-text);border-radius:8px;padding:6px 8px;font-size:12.5px;outline:none;min-width:110px;}
+  .gs-row .gs-unit{font-size:11px;color:var(--nv-text-dim);min-width:28px;}
+  .gs-hex{width:78px!important;font-family:ui-monospace,monospace;font-size:11.5px!important;}
+  .gs-deco-btns{display:flex;gap:4px;}
+  .gs-deco-btns button{width:32px;height:28px;border:1px solid var(--nv-border);background:var(--nv-panel-2);color:var(--nv-text-dim);border-radius:8px;cursor:pointer;font-size:12px;}
+  .gs-deco-btns button.active{background:var(--nv-accent);border-color:var(--nv-accent);color:#fff;}
+
+  /* =========================================================================
+     CUSTOM STYLE MANAGER — one property per row, label left / control right,
+     icon-row pickers, criss-cross composites, global/local dots.
+     ========================================================================= */
+  .nv-sm-section{border-bottom:1px solid var(--nv-border);}
+  .nv-sm-head{display:flex;align-items:center;gap:8px;padding:10px 12px;cursor:pointer;user-select:none;font-size:12px;font-weight:700;color:var(--nv-text);}
+  .nv-sm-head:hover{background:var(--nv-panel-2);}
+  .nv-sm-head i:first-child{width:14px;text-align:center;color:var(--nv-accent);font-size:12px;}
+  .nv-sm-head span{flex:1;letter-spacing:.02em;}
+  .nv-sm-chev{font-size:10px;color:var(--nv-text-dim);transition:transform .15s;}
+  .nv-sm-section.open .nv-sm-chev{transform:rotate(-180deg);}
+  .nv-sm-body{display:none;padding:4px 12px 12px;}
+  .nv-sm-section.open .nv-sm-body{display:block;}
+
+  .nv-sm-row{display:flex;align-items:flex-start;justify-content:space-between;gap:8px;padding:6px 0;border-bottom:1px solid rgba(255,255,255,.03);}
+  .nv-sm-row:last-child{border-bottom:none;}
+  .nv-sm-row.disabled{opacity:.35;pointer-events:none;}
+  .nv-sm-row--composite, .nv-sm-row--shadow-builder, .nv-sm-row--filter-builder, .nv-sm-row--transform-builder{flex-direction:column;align-items:stretch;gap:4px;}
+  .nv-sm-label-wrap{display:flex;align-items:flex-start;gap:5px;flex:0 1 42%;min-width:0;padding-top:2px;}
+  .nv-sm-row--composite .nv-sm-label-wrap, .nv-sm-row--shadow-builder .nv-sm-label-wrap, .nv-sm-row--filter-builder .nv-sm-label-wrap, .nv-sm-row--transform-builder .nv-sm-label-wrap{flex-basis:auto;padding-top:0;}
+  .nv-sm-label-wrap label{font-size:11px;color:var(--nv-text-dim);white-space:normal;word-break:break-word;line-height:1.3;}
+  .nv-sm-field{flex:1 1 56%;min-width:0;display:flex;flex-wrap:wrap;justify-content:flex-end;gap:4px;}
+  .nv-sm-row--composite .nv-sm-field, .nv-sm-row--shadow-builder .nv-sm-field, .nv-sm-row--filter-builder .nv-sm-field, .nv-sm-row--transform-builder .nv-sm-field{width:100%;}
+
+  .nv-style-dot{width:6px;height:6px;border-radius:50%;background:var(--nv-border);flex-shrink:0;margin-top:4px;}
+  .nv-style-dot.global{background:var(--nv-accent-2);box-shadow:0 0 4px rgba(34,195,166,.7);}
+  .nv-style-dot.local{background:var(--nv-local);box-shadow:0 0 4px rgba(255,92,168,.7);}
+
+  /* native selects/inputs used across rows */
+  .nv-sm-field select, .nv-sm-field > input[type=text]{
+    background:var(--nv-panel-2);border:1px solid var(--nv-border);color:var(--nv-text);
+    border-radius:8px;padding:5px 7px;font-size:11.5px;outline:none;width:100%;max-width:150px;
+  }
+  .nv-sm-field select:focus, .nv-sm-field input:focus{border-color:var(--nv-accent);}
+
+  /* icon rows (display, direction, justify, align, text-align, decoration, border-style...) —
+     icons wrap onto further lines when the panel is narrow, matching the label's own wrapping */
+  .nv-icon-row{display:flex;flex-wrap:wrap;gap:4px;justify-content:flex-end;width:100%;}
+  .nv-icon-btn{
+    width:24px;height:24px;border-radius:6px;border:1px solid var(--nv-border);background:var(--nv-panel-2);
+    color:var(--nv-text-dim);display:flex;align-items:center;justify-content:center;cursor:pointer;font-size:10.5px;flex-shrink:0;padding:0;
+  }
+  .nv-icon-btn:hover{color:var(--nv-text);}
+  .nv-icon-btn.active{background:var(--nv-accent);border-color:var(--nv-accent);color:#fff;}
+  .nv-icon-btn:disabled{cursor:not-allowed;}
+
+  /* number + unit */
+  .nv-num-wrap{display:flex;gap:4px;justify-content:flex-end;max-width:150px;margin-left:auto;}
+  .nv-num-wrap input{width:100%;min-width:0;background:var(--nv-panel-2);border:1px solid var(--nv-border);color:var(--nv-text);border-radius:8px;padding:5px 7px;font-size:11.5px;outline:none;}
+  .nv-num-wrap input:focus{border-color:var(--nv-accent);}
+  .nv-unit-sel{flex:0 0 44px;width:44px;padding:5px 2px!important;font-size:10px!important;}
+
+  /* color */
+  .nv-color-wrap{display:flex;align-items:center;gap:6px;justify-content:flex-end;max-width:150px;margin-left:auto;}
+  .nv-color-wrap input[type=color]{width:26px;height:26px;border:1px solid var(--nv-border);border-radius:7px;background:var(--nv-panel-2);cursor:pointer;padding:2px;flex-shrink:0;}
+  .nv-color-wrap input[type=text]{width:90px;font-family:ui-monospace,monospace;font-size:10.5px!important;background:var(--nv-panel-2);border:1px solid var(--nv-border);color:var(--nv-text);border-radius:7px;padding:5px 7px;outline:none;}
+  .nv-color-wrap input[type=text]:focus{border-color:var(--nv-accent);}
+
+  /* slider */
+  .nv-slider-wrap{display:flex;align-items:center;gap:8px;flex:1;justify-content:flex-end;}
+  .nv-slider-wrap input[type=range]{flex:1;max-width:110px;accent-color:var(--nv-accent);}
+  .nv-slider-val{font-size:10.5px;color:var(--nv-text-dim);min-width:34px;text-align:right;}
+
+  /* composite criss-cross (margin/padding/border-width/border-radius) */
+  .nv-composite{display:flex;flex-direction:column;gap:6px;}
+  .nv-composite-grid{
+    display:grid; grid-template-columns:1fr 1fr 1fr; grid-template-rows:auto auto auto;
+    gap:6px 4px;
+  }
+  .nv-composite-cell{display:flex;flex-direction:column;align-items:center;gap:3px;}
+  .nv-composite-cell--0{grid-column:2;grid-row:1;}
+  .nv-composite-cell--1{grid-column:3;grid-row:2;}
+  .nv-composite-cell--2{grid-column:2;grid-row:3;}
+  .nv-composite-cell--3{grid-column:1;grid-row:2;}
+  .nv-composite-lab{font-size:9.5px;color:var(--nv-text-dim);text-transform:uppercase;letter-spacing:.03em;}
+  .nv-composite-cell input{
+    width:100%;text-align:center;background:var(--nv-panel-2);border:1px solid var(--nv-border);color:var(--nv-text);
+    border-radius:7px;padding:5px 2px;font-size:11px;outline:none;
+  }
+  .nv-composite.nv-uniform .nv-composite-cell:not(.nv-composite-cell--0){display:none;}
+  .nv-composite.nv-uniform .nv-composite-grid{grid-template-columns:1fr;grid-template-rows:auto;}
+  .nv-composite.nv-uniform .nv-composite-cell--0{grid-column:1;grid-row:1;}
+  .nv-composite.nv-uniform .nv-composite-lab{display:none;}
+  .nv-composite .nv-unit-sel{align-self:flex-end;width:56px;flex:0 0 56px;}
+  .nv-space-modes{display:inline-flex;gap:4px;align-self:flex-end;}
+  .nv-space-modes button{
+    width:24px;height:20px;border:1px solid var(--nv-border);background:var(--nv-panel-2);
+    color:var(--nv-text-dim);border-radius:6px;cursor:pointer;font-size:10px;display:flex;align-items:center;justify-content:center;padding:0;
+  }
+  .nv-space-modes button.active{border-color:var(--nv-accent);color:var(--nv-accent);background:rgba(110,91,255,.12);}
+
+  /* image picker (background-image) */
+  .nv-image-picker{display:flex;align-items:center;gap:8px;width:100%;justify-content:flex-end;}
+  .nv-image-preview{width:32px;height:32px;border-radius:7px;background:var(--nv-panel-2) center/cover no-repeat;border:1px solid var(--nv-border);flex-shrink:0;}
+  .nv-image-picker .btn{padding:6px 10px;font-size:11.5px;}
+
+  /* shadow builder */
+  .nv-shadow-builder{display:flex;flex-wrap:wrap;gap:6px;align-items:center;}
+  .nv-shadow-cell{display:flex;flex-direction:column;gap:2px;width:52px;}
+  .nv-shadow-cell span{font-size:9.5px;color:var(--nv-text-dim);}
+  .nv-shadow-cell input{width:100%;background:var(--nv-panel-2);border:1px solid var(--nv-border);color:var(--nv-text);border-radius:7px;padding:5px 4px;font-size:11px;text-align:center;}
+  .nv-shadow-builder input[type=color]{width:28px;height:28px;border:1px solid var(--nv-border);border-radius:7px;background:var(--nv-panel-2);cursor:pointer;padding:2px;}
+  .nv-shadow-inset{display:flex;align-items:center;gap:4px;font-size:10.5px;color:var(--nv-text-dim);}
+  .nv-shadow-none{margin-left:auto;background:transparent;border:1px solid var(--nv-border);color:var(--nv-text-dim);border-radius:7px;padding:5px 8px;font-size:10.5px;cursor:pointer;}
+  .nv-shadow-none:hover{color:var(--nv-text);}
+
+  /* filter builder */
+  .nv-filter-builder{display:flex;flex-direction:column;gap:6px;width:100%;}
+  .nv-filter-row{display:flex;align-items:center;gap:8px;}
+  .nv-filter-row span:first-child{font-size:10.5px;color:var(--nv-text-dim);width:64px;flex-shrink:0;}
+  .nv-filter-row input[type=range]{flex:1;accent-color:var(--nv-accent);}
+  .nv-filter-row .nv-slider-val{width:40px;}
+
+  /* transform builder */
+  .nv-transform-builder{display:flex;flex-wrap:wrap;gap:6px;}
+  .nv-transform-cell{display:flex;flex-direction:column;gap:2px;width:66px;}
+  .nv-transform-cell span{font-size:9.5px;color:var(--nv-text-dim);}
+  .nv-transform-cell input{width:100%;background:var(--nv-panel-2);border:1px solid var(--nv-border);color:var(--nv-text);border-radius:7px;padding:5px 4px;font-size:11px;text-align:center;}
+
+  /* assets — custom grid (see nvRenderAssetGrid), not GrapesJS's built-in Asset Manager DOM */
+  .assets-head{display:flex;align-items:center;justify-content:space-between;padding:12px;border-bottom:1px solid var(--nv-border);flex-shrink:0;}
+  .assets-head h3{margin:0;font-size:13px;font-weight:700;}
+  #assets-search-wrap{padding:10px 12px;border-bottom:1px solid var(--nv-border);flex-shrink:0;}
+  #assets-search-wrap input{width:100%;background:var(--nv-panel-2);border:1px solid var(--nv-border);color:var(--nv-text);border-radius:10px;padding:8px 10px;font-size:13px;outline:none;}
+  #assets-container{flex:1;overflow-y:auto;min-height:0;padding:10px;}
+  #assets-container .nv-assets-grid,#assets-container{display:block;}
+  .nv-empty-assets{padding:24px 8px;text-align:center;color:var(--nv-text-dim);font-size:12.5px;}
+  .nv-asset-card{background:var(--nv-bg);border:1px solid var(--nv-border);border-radius:12px;overflow:hidden;position:relative;cursor:pointer;transition:.15s;}
+  .nv-asset-card:hover{border-color:var(--nv-accent);}
+  .nv-asset-thumb{height:90px;background-size:cover;background-position:center;background-color:var(--nv-panel-2);}
+  .nv-asset-meta{display:flex;align-items:center;justify-content:space-between;padding:6px 8px;font-size:11px;color:var(--nv-text-dim);gap:6px;}
+  .nv-asset-name{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:78%;}
+  .nv-asset-del{background:transparent;border:none;color:var(--nv-text-dim);cursor:pointer;width:20px;height:20px;flex-shrink:0;border-radius:4px;display:flex;align-items:center;justify-content:center;}
+  .nv-asset-del:hover{color:var(--nv-danger);background:rgba(255,255,255,.06);}
+
+  /* Left-panel Blocks/Layers/Style tab uses a simple 2-col grid for assets */
+  #left-side #assets-container{display:grid;grid-template-columns:1fr 1fr;gap:10px;}
+
+  /* Media Library page uses a bigger grid (see below, higher specificity) */
+
+  /* Modals */
+  .nv-modal-overlay{position:fixed;inset:0;background:rgba(6,7,10,.7);z-index:1000;display:none;align-items:center;justify-content:center;}
+  .nv-modal-overlay.show{display:flex;}
+  .nv-modal{width:760px;max-width:92vw;max-height:82vh;background:var(--nv-panel);border:1px solid var(--nv-border);border-radius:10px;display:flex;flex-direction:column;overflow:hidden;box-shadow:0 20px 60px rgba(0,0,0,.5);}
+  .nv-modal-head{display:flex;align-items:center;justify-content:space-between;padding:14px 16px;border-bottom:1px solid var(--nv-border);}
+  .nv-modal-head h3{margin:0;font-family:'Sora',sans-serif;font-size:15px;}
+  .nv-modal-body{padding:16px;overflow:auto;flex:1;}
+  .nv-modal-body textarea{width:100%;height:320px;background:#0e0f13;border:1px solid var(--nv-border);color:#c9e8ff;border-radius:6px;padding:10px;font-family:'SF Mono',Consolas,monospace;font-size:12px;resize:vertical;}
+  .nv-modal-foot{display:flex;justify-content:flex-end;gap:8px;padding:12px 16px;border-top:1px solid var(--nv-border);}
+  .nv-code-tabs{display:flex;gap:6px;margin-bottom:10px;}
+  .nv-code-tab{padding:6px 12px;font-size:12px;border-radius:6px;background:var(--nv-panel-2);color:var(--nv-text-dim);cursor:pointer;border:1px solid var(--nv-border);}
+  .nv-code-tab.active{color:#fff;background:var(--nv-accent);border-color:var(--nv-accent);}
+  .btn{padding:8px 14px;border-radius:6px;border:1px solid var(--nv-border);background:var(--nv-panel-2);color:var(--nv-text);font-size:12.5px;font-weight:600;cursor:pointer;}
+  .btn:hover{border-color:var(--nv-accent);}
+  .btn.primary{background:var(--nv-accent);border-color:var(--nv-accent);color:#fff;}
+  .btn.primary:hover{background:#5c4ce6;}
+
+  /* Scrollbars */
+  ::-webkit-scrollbar{width:9px;height:9px;}
+  ::-webkit-scrollbar-track{background:transparent;}
+  ::-webkit-scrollbar-thumb{background:var(--nv-border);border-radius:6px;}
+  ::-webkit-scrollbar-thumb:hover{background:#3b3f4d;}
+</style>
+</head>
+<body>
+<div id="gjs-am-hidden" style="display:none;"></div>
+<div id="app">
+
+  <!-- Persistent global icon rail: Blocks/Layers/Style up top, page nav grouped at the bottom -->
+  <div id="icon-rail">
+    <div class="rail-group-top">
+      <div class="rail-btn active" data-pane="pane-blocks" title="Blocks"><i class="fa-solid fa-shapes"></i></div>
+      <div class="rail-btn" data-pane="pane-layers" title="Layers"><i class="fa-solid fa-layer-group"></i></div>
+      <div class="rail-btn" data-pane="pane-styles" title="Style &amp; Settings"><i class="fa-solid fa-sliders"></i></div>
+    </div>
+    <div class="rail-spacer"></div>
+    <div class="rail-group-pages">
+      <div class="rail-page-btn active" data-page="page-design" title="Design"><i class="fa-solid fa-pen-ruler"></i></div>
+      <div class="rail-page-btn" data-page="page-theme" title="Theme"><i class="fa-solid fa-palette"></i></div>
+      <div class="rail-page-btn" data-page="page-library" title="Media Library"><i class="fa-regular fa-image"></i></div>
+      <div class="rail-page-btn" data-page="page-project" title="Project"><i class="fa-solid fa-diagram-project"></i></div>
+    </div>
+  </div>
+
+  <div id="page-shell">
+
+  <!-- ============================= PAGE: DESIGN ============================= -->
+  <div class="page active" id="page-design">
+    <!-- Design page toolbar: everything tied to the canvas -->
+    <div id="design-toolbar">
+      <div class="tb-group">
+        <button class="tb-btn burger-btn active" id="btn-toggle-panel" title="Toggle panel"><i class="fa-solid fa-bars"></i></button>
+        <div class="tb-sep"></div>
+        <button class="tb-btn" id="btn-undo" title="Undo (Ctrl+Z)"><i class="fa-solid fa-rotate-left"></i></button>
+        <button class="tb-btn" id="btn-redo" title="Redo (Ctrl+Shift+Z)"><i class="fa-solid fa-rotate-right"></i></button>
+        <button class="tb-btn" id="btn-clear" title="Clear canvas"><i class="fa-solid fa-trash"></i></button>
+      </div>
+      <div class="tb-group">
+        <select class="device-select" id="device-select" title="Preview device">
+          <option value="Desktop">🖥 Desktop</option>
+          <option value="Tablet">📱 Tablet</option>
+          <option value="Mobile landscape">📱 Mobile landscape</option>
+          <option value="Mobile portrait">📱 Mobile portrait</option>
+        </select>
+        <button class="tb-btn" id="btn-preview" title="Preview"><i class="fa-regular fa-eye"></i></button>
+        <button class="tb-btn" id="btn-borders" title="Toggle outlines"><i class="fa-regular fa-square"></i></button>
+        <button class="tb-btn" id="btn-fullscreen" title="Fullscreen"><i class="fa-solid fa-expand"></i></button>
+      </div>
+      <div class="tb-group">
+        <span class="tb-status"><span class="pulse"></span><span id="save-status">Saved</span></span>
+      </div>
+    </div>
+
+    <!-- Main Grid -->
+    <div id="main">
+      <!-- Single side panel — pushes the canvas rather than covering it.
+           Blocks / Layers / Style&Settings all live here, switched via the rail. -->
+      <div class="side" id="left-side">
+        <button class="drawer-close" id="btn-close-left" title="Collapse panel"><i class="fa-solid fa-angles-left"></i></button>
+        <div class="side-resize-handle" id="side-resize-handle" title="Drag to resize"></div>
+
+        <!-- Blocks pane -->
+        <div class="side-pane active" id="pane-blocks">
+          <div class="side-tabs" id="blocks-subtabs">
+            <div class="side-tab active" data-blockcat="Widgets">Widgets</div>
+            <div class="side-tab" data-blockcat="Components">Components</div>
+            <div class="side-tab" data-blockcat="Sections">Sections</div>
+            <div class="side-tab" data-blockcat="Library">Library</div>
+          </div>
+          <div class="search-wrap"><input type="text" id="block-search" placeholder="Search widgets…"></div>
+          <div id="blocks-container"></div>
+        </div>
+
+        <!-- Layers pane -->
+        <div class="side-pane" id="pane-layers">
+          <div id="layers-container"></div>
+        </div>
+
+        <!-- Style & Settings pane — auto-selected whenever an element is clicked -->
+        <div class="side-pane" id="pane-styles">
+          <div class="right-tabs">
+            <div class="right-tab active" data-rpane="pane-style">Style</div>
+            <div class="right-tab" data-rpane="pane-settings">Settings</div>
+          </div>
+
+          <div class="right-pane active" id="pane-style" style="flex-direction:column;">
+            <div id="style-header">
+              <div class="comp-badge">
+                <div class="ic"><i class="fa-solid fa-grip"></i></div>
+                <div>
+                  <div class="nm" id="style-comp-name">Body</div>
+                  <div class="id" id="style-comp-id"></div>
+                </div>
+              </div>
+              <div id="selectors-container"></div>
+              <div class="quick-actions">
+                <div class="qa-btn" id="qa-select-parent" title="Select parent"><i class="fa-solid fa-arrow-up-from-bracket"></i></div>
+                <div class="qa-btn" id="qa-duplicate" title="Duplicate"><i class="fa-regular fa-copy"></i></div>
+                <div class="qa-btn" id="qa-code" title="View component code"><i class="fa-solid fa-code"></i></div>
+                <div class="qa-btn" id="qa-save-library" title="Save component to library"><i class="fa-regular fa-star"></i></div>
+              </div>
+            </div>
+            <div id="styles-container"></div>
+          </div>
+
+          <div class="right-pane" id="pane-settings">
+            <div class="comp-badge">
+              <div class="ic"><i class="fa-solid fa-sliders"></i></div>
+              <div>
+                <div class="nm">Settings</div>
+                <div class="id">Select an element to edit</div>
+              </div>
+            </div>
+            <div id="traits-container"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Canvas -->
+      <div id="canvas-wrap">
+        <div id="library-pick-banner">
+          <span><i class="fa-solid fa-circle-info"></i> Pick an image below for the selected element</span>
+          <button id="btn-cancel-pick">Cancel</button>
+        </div>
+        <div id="canvas-scroll">
+          <div id="gjs"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============================= PAGE: THEME ============================= -->
+  <div class="page" id="page-theme">
+    <div class="page-head">
+      <h2><i class="fa-solid fa-palette"></i> Theme</h2>
+      <p>Site-wide colors, typography, and defaults — changes apply everywhere the corresponding element is used.</p>
+    </div>
+    <div class="page-body">
+      <div id="page-theme-inner">
+        <div id="globalstyles-container">
+          <!-- Colors -->
+          <div class="gs-section" data-gs="colors">
+            <div class="gs-section-head"><span class="gs-title">Colors</span><i class="fa-solid fa-chevron-down gs-chev"></i></div>
+            <div class="gs-body">
+              <div class="gs-row"><label>Primary</label><div class="gs-field"><input type="color" id="gs-primary" value="#6e5bff"><input type="text" class="gs-hex" id="gs-primary-hex" value="#6e5bff"></div></div>
+              <div class="gs-row"><label>Secondary</label><div class="gs-field"><input type="color" id="gs-secondary" value="#22c3a6"><input type="text" class="gs-hex" id="gs-secondary-hex" value="#22c3a6"></div></div>
+              <div class="gs-row"><label>Accent</label><div class="gs-field"><input type="color" id="gs-accent" value="#ffb347"><input type="text" class="gs-hex" id="gs-accent-hex" value="#ffb347"></div></div>
+              <div class="gs-row"><label>Success</label><div class="gs-field"><input type="color" id="gs-success" value="#28a745"><input type="text" class="gs-hex" id="gs-success-hex" value="#28a745"></div></div>
+              <div class="gs-row"><label>Warning</label><div class="gs-field"><input type="color" id="gs-warning" value="#ffc107"><input type="text" class="gs-hex" id="gs-warning-hex" value="#ffc107"></div></div>
+              <div class="gs-row"><label>Error</label><div class="gs-field"><input type="color" id="gs-error" value="#dc3545"><input type="text" class="gs-hex" id="gs-error-hex" value="#dc3545"></div></div>
+            </div>
+          </div>
+          <!-- Body -->
+          <div class="gs-section" data-gs="body">
+            <div class="gs-section-head"><span class="gs-title">Body</span><i class="fa-solid fa-chevron-down gs-chev"></i></div>
+            <div class="gs-body">
+              <div class="gs-row"><label>Font Family</label>
+                <select id="gs-font">
+                  <option value="'Inter', sans-serif">Inter</option>
+                  <option value="'Sora', sans-serif">Sora</option>
+                  <option value="Georgia, serif">Georgia</option>
+                  <option value="Arial, sans-serif">Arial</option>
+                </select>
+              </div>
+              <div class="gs-row"><label>Font Size</label><div class="gs-field"><input type="number" id="gs-body-size" value="16" step="1" min="10"><span class="gs-unit">px</span></div></div>
+              <div class="gs-row"><label>Line Height</label><div class="gs-field"><input type="number" id="gs-body-lh" value="1.6" step="0.05" min="1"><span class="gs-unit">—</span></div></div>
+              <div class="gs-row"><label>Text color</label><div class="gs-field"><input type="color" id="gs-ink" value="#1b1d24"><input type="text" class="gs-hex" id="gs-ink-hex" value="#1b1d24"></div></div>
+            </div>
+          </div>
+          <!-- Heading -->
+          <div class="gs-section" data-gs="heading">
+            <div class="gs-section-head"><span class="gs-title">Heading</span><i class="fa-solid fa-chevron-down gs-chev"></i></div>
+            <div class="gs-body">
+              <div class="gs-row"><label>Color</label><div class="gs-field"><input type="color" id="gs-h-color" value="#1b1d24"><input type="text" class="gs-hex" id="gs-h-color-hex" value="#1b1d24"></div></div>
+              <div class="gs-row"><label>Font Size</label><div class="gs-field"><input type="number" id="gs-h-size" value="1.5" step="0.05" min="0.5"><span class="gs-unit">rem</span></div></div>
+              <div class="gs-row"><label>Line Height</label><div class="gs-field"><input type="number" id="gs-h-lh" value="1.25" step="0.05" min="1"><span class="gs-unit">—</span></div></div>
+              <div class="gs-row"><label>Font Family</label>
+                <select id="gs-h-font">
+                  <option value="inherit">Default</option>
+                  <option value="'Sora', sans-serif">Sora</option>
+                  <option value="'Inter', sans-serif">Inter</option>
+                  <option value="Georgia, serif">Georgia</option>
+                </select>
+              </div>
+            </div>
+          </div>
+          <!-- Subheading -->
+          <div class="gs-section" data-gs="subheading">
+            <div class="gs-section-head"><span class="gs-title">Subheading</span><i class="fa-solid fa-chevron-down gs-chev"></i></div>
+            <div class="gs-body">
+              <div class="gs-row"><label>Color</label><div class="gs-field"><input type="color" id="gs-sh-color" value="#6b7280"><input type="text" class="gs-hex" id="gs-sh-color-hex" value="#6b7280"></div></div>
+              <div class="gs-row"><label>Font Size</label><div class="gs-field"><input type="number" id="gs-sh-size" value="1.2" step="0.05" min="0.5"><span class="gs-unit">rem</span></div></div>
+              <div class="gs-row"><label>Line Height</label><div class="gs-field"><input type="number" id="gs-sh-lh" value="1.4" step="0.05" min="1"><span class="gs-unit">—</span></div></div>
+              <div class="gs-row"><label>Font Family</label>
+                <select id="gs-sh-font">
+                  <option value="inherit">Default</option>
+                  <option value="'Sora', sans-serif">Sora</option>
+                  <option value="'Inter', sans-serif">Inter</option>
+                </select>
+              </div>
+            </div>
+          </div>
+          <!-- Buttons -->
+          <div class="gs-section" data-gs="buttons">
+            <div class="gs-section-head"><span class="gs-title">Buttons</span><i class="fa-solid fa-chevron-down gs-chev"></i></div>
+            <div class="gs-body">
+              <div class="gs-row"><label>Background</label><div class="gs-field"><input type="color" id="gs-btn-bg" value="#6e5bff"><input type="text" class="gs-hex" id="gs-btn-bg-hex" value="#6e5bff"></div></div>
+              <div class="gs-row"><label>Color</label><div class="gs-field"><input type="color" id="gs-btn-color" value="#ffffff"><input type="text" class="gs-hex" id="gs-btn-color-hex" value="#ffffff"></div></div>
+              <div class="gs-row"><label>Border Radius</label>
+                <select id="gs-btn-radius">
+                  <option value="6px">Small</option>
+                  <option value="10px" selected>Medium</option>
+                  <option value="999px">Pill</option>
+                  <option value="0">None</option>
+                </select>
+              </div>
+            </div>
+          </div>
+          <!-- Links -->
+          <div class="gs-section" data-gs="links">
+            <div class="gs-section-head"><span class="gs-title">Links</span><i class="fa-solid fa-chevron-down gs-chev"></i></div>
+            <div class="gs-body">
+              <div class="gs-row"><label>Color</label><div class="gs-field"><input type="color" id="gs-link-color" value="#6e5bff"><input type="text" class="gs-hex" id="gs-link-color-hex" value="#6e5bff"></div></div>
+              <div class="gs-row"><label>Decoration</label>
+                <div class="gs-deco-btns">
+                  <button type="button" id="gs-link-none" title="None" class="active"><i class="fa-solid fa-xmark"></i></button>
+                  <button type="button" id="gs-link-underline" title="Underline"><u>U</u></button>
+                </div>
+              </div>
+            </div>
+          </div>
+          <!-- Borders -->
+          <div class="gs-section" data-gs="borders">
+            <div class="gs-section-head"><span class="gs-title">Borders</span><i class="fa-solid fa-chevron-down gs-chev"></i></div>
+            <div class="gs-body">
+              <div class="gs-row"><label>Border Radius</label>
+                <select id="gs-border-radius">
+                  <option value="6px" selected>Small</option>
+                  <option value="12px">Medium</option>
+                  <option value="20px">Large</option>
+                  <option value="0">None</option>
+                </select>
+              </div>
+              <div class="gs-row"><label>Border Color</label><div class="gs-field"><input type="color" id="gs-border-color" value="#e0e0e0"><input type="text" class="gs-hex" id="gs-border-color-hex" value="#e0e0e0"></div></div>
+            </div>
+          </div>
+          <!-- CSS Framework -->
+          <div class="gs-section" data-gs="framework">
+            <div class="gs-section-head"><span class="gs-title">CSS Framework</span><i class="fa-solid fa-chevron-down gs-chev"></i></div>
+            <div class="gs-body">
+              <div class="gs-row" style="flex-direction:column; align-items:stretch; gap:8px;">
+                <label style="margin-bottom:2px;">Upload a .css file</label>
+                <p style="margin:0 0 4px;font-size:12px;color:var(--nv-text-dim);">e.g. a copy of Bootstrap/Bulma/Tailwind's compiled CSS. Its rules are applied to the canvas and export, and its classes become searchable on the Style tab.</p>
+                <div class="gs-field" style="width:100%;gap:8px;">
+                  <button class="btn" id="btn-framework-upload" type="button" style="width:100%;justify-content:center;"><i class="fa-solid fa-upload"></i> Choose CSS file</button>
+                  <input type="file" id="gs-framework-file" accept=".css,text/css" style="display:none">
+                </div>
+                <div id="gs-framework-status" style="font-size:12px;color:var(--nv-text-dim);"></div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+
+  <!-- ============================= PAGE: MEDIA LIBRARY ============================= -->
+  <div class="page" id="page-library">
+    <div class="page-head">
+      <h2><i class="fa-regular fa-image"></i> Media Library</h2>
+      <p>Upload and manage images. Select an image element on the Design canvas first, then pick one here to apply it.</p>
+    </div>
+    <div class="page-body">
+      <div id="page-library-inner">
+        <div class="assets-head">
+          <div id="assets-search-wrap"><input type="text" id="assets-search" placeholder="Search images…"></div>
+          <button class="btn primary" id="btn-asset-upload" title="Upload image"><i class="fa-solid fa-plus"></i> Upload image</button>
+        </div>
+        <span id="assets-status"></span>
+        <div id="assets-container"></div>
+        <input type="file" id="asset-file-input" accept="image/*" multiple style="display:none">
+      </div>
+    </div>
+  </div>
+
+  <!-- ============================= PAGE: PROJECT ============================= -->
+  <div class="page" id="page-project">
+    <div class="page-head">
+      <h2><i class="fa-solid fa-diagram-project"></i> Project</h2>
+      <p>Manage saved projects, import existing markup, inspect generated code, and export your finished site.</p>
+    </div>
+    <div class="page-body">
+      <div id="page-project-inner">
+
+        <div class="proj-card">
+          <h3>Active project</h3>
+          <div class="proj-row">
+            <select class="project-select" id="project-select" title="Active Project"></select>
+            <button class="btn" id="btn-new-project"><i class="fa-solid fa-folder-plus"></i> New</button>
+            <button class="btn danger" id="btn-delete-project"><i class="fa-regular fa-trash-can"></i> Delete</button>
+          </div>
+        </div>
+
+        <div class="proj-card">
+          <h3>Backup &amp; restore</h3>
+          <div class="proj-row">
+            <button class="btn" id="btn-backup-projects"><i class="fa-solid fa-cloud-arrow-down"></i> Backup all projects</button>
+            <button class="btn" id="btn-restore-projects"><i class="fa-solid fa-cloud-arrow-up"></i> Restore from file</button>
+            <input type="file" id="restore-file-input" accept=".json" style="display:none">
+          </div>
+        </div>
+
+        <div class="proj-card">
+          <h3>Markup</h3>
+          <div class="proj-row">
+            <button class="btn" id="btn-import"><i class="fa-solid fa-file-import"></i> Import HTML</button>
+            <button class="btn" id="btn-code"><i class="fa-solid fa-code"></i> View code</button>
+          </div>
+        </div>
+
+        <div class="proj-card">
+          <h3>Export</h3>
+          <p class="proj-hint">Download a standalone HTML file with your finished site — no builder chrome, just the page.</p>
+          <div class="proj-row">
+            <button class="btn primary" id="btn-export"><i class="fa-solid fa-download"></i> Export site</button>
+          </div>
+        </div>
+
+      </div>
+    </div>
+  </div>
+
+  </div>
+</div>
+
+<!-- Code modal -->
+<div class="nv-modal-overlay" id="code-modal">
+  <div class="nv-modal">
+    <div class="nv-modal-head"><h3>View code</h3><button class="tb-btn" onclick="closeModal('code-modal')"><i class="fa-solid fa-xmark"></i></button></div>
+    <div class="nv-modal-body">
+      <div class="nv-code-tabs">
+        <div class="nv-code-tab active" data-code="html">HTML</div>
+        <div class="nv-code-tab" data-code="css">CSS</div>
+      </div>
+      <textarea id="code-html" readonly></textarea>
+      <textarea id="code-css" readonly style="display:none"></textarea>
+    </div>
+    <div class="nv-modal-foot">
+      <button class="btn" id="btn-copy-code">Copy</button>
+      <button class="btn primary" onclick="closeModal('code-modal')">Close</button>
+    </div>
+  </div>
+</div>
+
+<!-- Import HTML modal -->
+<div class="nv-modal-overlay" id="import-modal">
+  <div class="nv-modal">
+    <div class="nv-modal-head"><h3>Import HTML</h3><button class="tb-btn" onclick="closeModal('import-modal')"><i class="fa-solid fa-xmark"></i></button></div>
+    <div class="nv-modal-body">
+      <textarea id="import-textarea" placeholder="Paste HTML markup here…"></textarea>
+    </div>
+    <div class="nv-modal-foot">
+      <button class="btn" onclick="closeModal('import-modal')">Cancel</button>
+      <button class="btn primary" id="btn-do-import">Import</button>
+    </div>
+  </div>
+</div>
+
+<script src="https://unpkg.com/grapesjs@0.23.4/dist/grapes.min.js"></script>
+<script>
+(function(){
+
+/* =========================================================================
+   NOVA DB — a tiny generic IndexedDB-backed key/value store, used for
+   everything that used to live in localStorage: uploaded images, saved
+   projects, the saved-component library, and the uploaded CSS framework.
+   IndexedDB has no practical 5-10MB ceiling like localStorage, so this is
+   far more resilient for image-heavy projects.
+   ========================================================================= */
+var nvDB = (function(){
+  var DB_NAME = 'nova_builder_db';
+  var STORE = 'kv';
+  var dbPromise = null;
+  function openDB(){
+    if (dbPromise) return dbPromise;
+    dbPromise = new Promise(function(resolve, reject){
+      if (!window.indexedDB) { reject(new Error('IndexedDB not supported')); return; }
+      var req = indexedDB.open(DB_NAME, 1);
+      req.onupgradeneeded = function(e){
+        var db = e.target.result;
+        if (!db.objectStoreNames.contains(STORE)) db.createObjectStore(STORE);
+      };
+      req.onsuccess = function(){ resolve(req.result); };
+      req.onerror = function(){ reject(req.error); };
+    });
+    return dbPromise;
+  }
+  function get(key){
+    return openDB().then(function(db){ return new Promise(function(resolve, reject){
+      var req = db.transaction(STORE, 'readonly').objectStore(STORE).get(key);
+      req.onsuccess = function(){ resolve(req.result === undefined ? null : req.result); };
+      req.onerror = function(){ reject(req.error); };
+    }); });
+  }
+  function set(key, value){
+    return openDB().then(function(db){ return new Promise(function(resolve, reject){
+      var tx = db.transaction(STORE, 'readwrite');
+      tx.objectStore(STORE).put(value, key);
+      tx.oncomplete = function(){ resolve(true); };
+      tx.onerror = function(){ reject(tx.error); };
+    }); });
+  }
+  function remove(key){
+    return openDB().then(function(db){ return new Promise(function(resolve, reject){
+      var tx = db.transaction(STORE, 'readwrite');
+      tx.objectStore(STORE).delete(key);
+      tx.oncomplete = function(){ resolve(true); };
+      tx.onerror = function(){ reject(tx.error); };
+    }); });
+  }
+  function keys(prefix){
+    return openDB().then(function(db){ return new Promise(function(resolve, reject){
+      var store = db.transaction(STORE, 'readonly').objectStore(STORE);
+      if (store.getAllKeys) {
+        var req = store.getAllKeys();
+        req.onsuccess = function(){ resolve((req.result||[]).filter(function(k){ return !prefix || String(k).indexOf(prefix)===0; })); };
+        req.onerror = function(){ reject(req.error); };
+      } else {
+        var out = []; var cur = store.openCursor();
+        cur.onsuccess = function(e){ var c = e.target.result; if (c){ if(!prefix||String(c.key).indexOf(prefix)===0) out.push(c.key); c.continue(); } else resolve(out); };
+        cur.onerror = function(){ reject(cur.error); };
+      }
+    }); });
+  }
+  return { get:get, set:set, remove:remove, keys:keys };
+})();
+
+/* One-time migration: pull any existing localStorage data into IndexedDB so
+   nobody's projects/images/library disappear when this ships. Safe to run
+   every load — it only copies keys IndexedDB doesn't have yet. */
+function nvMigrateFromLocalStorage(){
+  return nvDB.get('nova-projects-list').then(function(existing){
+    if (existing) return; // already migrated
+    var toCopy = [];
+    for (var i = 0; i < localStorage.length; i++) {
+      var k = localStorage.key(i);
+      if (k && k.indexOf('nova-') === 0) toCopy.push(k);
+      if (k === 'nova_builder_assets_v1') toCopy.push(k);
+    }
+    return Promise.all(toCopy.map(function(k){
+      try { return nvDB.set(k, JSON.parse(localStorage.getItem(k))); }
+      catch(e){ return nvDB.set(k, localStorage.getItem(k)); }
+    }));
+  }).catch(function(){});
+}
+
+/* =========================================================================
+   RUNTIME CSS + JS
+   ========================================================================= */
+var RUNTIME_CSS = `
+:root{ --p:#6e5bff; --p2:#22c3a6; --ink:#1b1d24; --muted:#6b7280; --light:#f7f7fb; --border:#e4e6ec; }
+body{ font-family:'Inter',sans-serif; color:var(--ink); margin:0; line-height:1.6; }
+img{ max-width:100%; height:auto; display:block; }
+.nv-section{ padding:80px 24px; position:relative; }
+.nv-container{ max-width:1140px; margin:0 auto; padding:0 20px; width:100%; }
+.nv-row{ display:flex; gap:30px; flex-wrap:wrap; }
+.nv-col{ flex:1; min-width:260px; display:flex; flex-direction:column; }
+.nv-btn{ display:inline-block; padding:12px 28px; border-radius:6px; background:var(--p); color:#fff!important; text-decoration:none; font-weight:600; font-size:15px; border:2px solid var(--p); cursor:pointer; transition:.2s; text-align:center; }
+.nv-btn:hover{ opacity:.9; transform:translateY(-1px); }
+.nv-btn.outline{ background:transparent; color:var(--p)!important; }
+.nv-btn.rounded{ border-radius:999px; }
+.nv-divider{ height:1px; background:var(--border); width:100%; margin:30px 0; border:none; }
+.nv-spacer{ width:100%; }
+.nv-badge{ display:inline-block; padding:4px 10px; border-radius:99px; background:rgba(110,91,255,.12); color:var(--p); font-size:12px; font-weight:700; text-transform:uppercase; letter-spacing:0.05em; margin-bottom:12px; }
+
+/* Components */
+.nv-card{ background:#fff; border:1px solid var(--border); border-radius:12px; overflow:hidden; transition:.2s; }
+.nv-card:hover{ box-shadow:0 10px 30px rgba(0,0,0,.08); transform:translateY(-3px); }
+.nv-card img{ width:100%; height:200px; object-fit:cover; }
+.nv-card-body{ padding:24px; }
+.nv-card-body h4{ margin:0 0 10px; font-family:'Sora',sans-serif; font-size:20px; }
+.nv-card-body p{ color:var(--muted); font-size:14px; margin:0 0 20px; }
+
+.nv-icon-box{ text-align:center; padding:24px; }
+.nv-icon-box .ic{ width:64px; height:64px; border-radius:16px; background:rgba(110,91,255,.12); color:var(--p); display:flex; align-items:center; justify-content:center; font-size:24px; margin:0 auto 16px; }
+.nv-icon-box.left{ text-align:left; }
+.nv-icon-box.left .ic{ margin:0 0 16px 0; }
+.nv-icon-box h4{ margin:0 0 8px; font-family:'Sora',sans-serif; font-size:18px; }
+.nv-icon-box p{ color:var(--muted); margin:0; font-size:14px; }
+
+.nv-icon-list{ list-style:none; padding:0; margin:0; }
+.nv-icon-list li{ display:flex; align-items:center; gap:12px; padding:10px 0; color:var(--ink); font-size:15px; }
+.nv-icon-list i{ color:var(--p2); font-size:18px; }
+
+.nv-testimonial{ background:var(--light); border-radius:12px; padding:32px; position:relative; }
+.nv-testimonial .quote{ font-size:16px; font-style:italic; color:#33343d; margin-bottom:20px; }
+.nv-testimonial .who{ display:flex; align-items:center; gap:14px; }
+.nv-testimonial .who img{ width:48px; height:48px; border-radius:50%; object-fit:cover; }
+.nv-testimonial .who b{ font-size:15px; display:block; color:var(--ink); }
+.nv-testimonial .who span{ font-size:13px; color:var(--muted); }
+
+.nv-team{ text-align:center; }
+.nv-team img{ width:120px; height:120px; border-radius:50%; object-fit:cover; margin-bottom:16px; border:3px solid #fff; box-shadow:0 8px 20px rgba(0,0,0,.1); }
+.nv-team h4{ margin:0 0 4px; font-family:'Sora',sans-serif; font-size:18px; }
+.nv-team span{ color:var(--p); font-size:14px; display:block; margin-bottom:12px; }
+
+.nv-price-card{ border:1px solid var(--border); border-radius:16px; padding:40px 32px; text-align:center; background:#fff; position:relative; }
+.nv-price-card.featured{ border-color:var(--p); box-shadow:0 12px 40px rgba(110,91,255,.15); transform:scale(1.05); z-index:2; }
+.nv-price-card .tag{ position:absolute; top:-12px; left:50%; transform:translateX(-50%); background:var(--p); color:#fff; font-size:12px; font-weight:700; padding:4px 12px; border-radius:99px; text-transform:uppercase; letter-spacing:0.05em; }
+.nv-price-card h3{ margin:0 0 10px; font-family:'Sora',sans-serif; }
+.nv-price-card .amt{ font-family:'Sora',sans-serif; font-size:48px; font-weight:800; margin:10px 0; color:var(--ink); }
+.nv-price-card .amt span{ font-size:16px; font-weight:500; color:var(--muted); }
+.nv-price-card ul{ list-style:none; padding:0; margin:24px 0 32px; text-align:left; }
+.nv-price-card ul li{ padding:10px 0; border-top:1px solid var(--border); font-size:15px; color:var(--muted); display:flex; align-items:center; gap:10px; }
+.nv-price-card ul li i{ color:var(--p2); }
+
+.nv-counter{ text-align:center; }
+.nv-counter .num{ font-family:'Sora',sans-serif; font-size:54px; font-weight:800; color:var(--p); line-height:1; }
+.nv-counter .lbl{ color:var(--ink); font-size:15px; font-weight:600; margin-top:12px; }
+
+.nv-accordion{ border:1px solid var(--border); border-radius:10px; overflow:hidden; }
+.nv-accordion-item + .nv-accordion-item{ border-top:1px solid var(--border); }
+.nv-accordion-header{ padding:20px 24px; display:flex; align-items:center; justify-content:space-between; cursor:pointer; font-weight:600; background:#fff; font-size:16px; }
+.nv-accordion-header .car{ transition:.3s; color:var(--muted); }
+.nv-accordion-item.open .nv-accordion-header .car{ transform:rotate(180deg); color:var(--p); }
+.nv-accordion-body{ max-height:0; overflow:hidden; transition:max-height .3s ease; background:var(--light); }
+.nv-accordion-item.open .nv-accordion-body{ max-height:500px; }
+.nv-accordion-body-inner{ padding:0 24px 20px; color:var(--muted); font-size:15px; line-height:1.6; }
+
+.nv-form{ display:flex; flex-direction:column; gap:16px; width:100%; }
+.nv-form input, .nv-form textarea{ padding:14px 16px; border:1px solid var(--border); border-radius:8px; font-family:inherit; font-size:15px; outline:none; transition:.2s; background:#fff; }
+.nv-form input:focus, .nv-form textarea:focus{ border-color:var(--p); box-shadow:0 0 0 3px rgba(110,91,255,.1); }
+.nv-form label{ font-size:14px; font-weight:600; margin-bottom:-8px; color:var(--ink); }
+
+.nv-navbar{ display:flex; align-items:center; justify-content:space-between; padding:20px 32px; background:#fff; border-bottom:1px solid var(--border); }
+.nv-navbar .brand{ font-family:'Sora',sans-serif; font-weight:800; font-size:22px; color:var(--ink); text-decoration:none; display:flex; align-items:center; gap:8px; }
+.nv-navbar nav{ display:flex; gap:32px; }
+.nv-navbar nav a{ text-decoration:none; color:var(--muted); font-size:15px; font-weight:600; transition:.2s; }
+.nv-navbar nav a:hover{ color:var(--p); }
+.nv-navbar.center{ flex-direction:column; gap:20px; padding:24px; }
+
+.nv-footer{ background:var(--ink); color:#a0a2b3; padding:64px 32px 24px; }
+.nv-footer h4{ color:#fff; font-family:'Sora',sans-serif; margin-top:0; font-size:18px; margin-bottom:24px; }
+.nv-footer .cols{ display:flex; gap:40px; flex-wrap:wrap; margin-bottom:40px; }
+.nv-footer .cols > div{ flex:1; min-width:200px; }
+.nv-footer a{ color:#a0a2b3; text-decoration:none; display:block; margin:10px 0; font-size:14px; transition:.2s; }
+.nv-footer a:hover{ color:#fff; }
+.nv-footer .bottom{ border-top:1px solid #2c2f3a; padding-top:24px; font-size:13px; display:flex; justify-content:space-between; align-items:center; }
+
+.nv-hero{ padding:120px 32px; text-align:center; background:linear-gradient(135deg,#1b1d24,#111216); color:#fff; }
+.nv-hero h1{ font-family:'Sora',sans-serif; font-size:56px; margin:0 0 20px; line-height:1.1; }
+.nv-hero p{ font-size:18px; color:#a0a2b3; max-width:640px; margin:0 auto 32px; line-height:1.6; }
+.nv-hero.gradient{ background:linear-gradient(135deg,var(--p),var(--p2)); }
+.nv-hero.gradient p{ color:rgba(255,255,255,.9); }
+`;
+
+var RUNTIME_JS = `
+(function(){
+  document.addEventListener('click', function(e){
+    var head = e.target.closest('.nv-accordion-header');
+    if(head){
+      var item = head.closest('.nv-accordion-item');
+      var wasOpen = item.classList.contains('open');
+      var parent = item.closest('.nv-accordion');
+      if(parent && parent.getAttribute('data-single') !== 'false'){
+        parent.querySelectorAll('.nv-accordion-item').forEach(function(i){ i.classList.remove('open'); });
+      }
+      if(!wasOpen) item.classList.add('open');
+    }
+  });
+
+  function animateCounters(){
+    document.querySelectorAll('.nv-counter[data-end]').forEach(function(el){
+      if(el.getAttribute('data-done')) return;
+      var rect = el.getBoundingClientRect();
+      if(rect.top > (window.innerHeight||document.documentElement.clientHeight)) return;
+      el.setAttribute('data-done','1');
+      var end = parseInt(el.getAttribute('data-end'),10) || 0;
+      var numEl = el.querySelector('.num');
+      var dur = 1500, start = performance.now();
+      function frame(t){
+        var p = Math.min(1,(t-start)/dur);
+        numEl.textContent = Math.floor(p*end);
+        if(p<1) requestAnimationFrame(frame); else numEl.textContent = end;
+      }
+      requestAnimationFrame(frame);
+    });
+  }
+  window.addEventListener('scroll', animateCounters, {passive:true});
+  window.addEventListener('load', animateCounters);
+  setTimeout(animateCounters, 300);
+})();
+`;
+
+/* =========================================================================
+   CLEAN, SEMANTIC BLOCK LIBRARY
+   ========================================================================= */
+var blocks = [
+  // --- LAYOUT ---
+  { id:'nv-section', label:'Section', category:'Layout', icon:'fa-square', content:'<section class="nv-section"><div class="nv-container"><h2>New Section</h2><p>Drop elements here.</p></div></section>' },
+  { id:'nv-container', label:'Container', category:'Layout', icon:'fa-square-full', content:'<div class="nv-container"></div>' },
+  { id:'nv-row2', label:'2 Columns', category:'Layout', icon:'fa-table-columns', content:'<div class="nv-row"><div class="nv-col"></div><div class="nv-col"></div></div>' },
+  { id:'nv-row3', label:'3 Columns', category:'Layout', icon:'fa-grip', content:'<div class="nv-row"><div class="nv-col"></div><div class="nv-col"></div><div class="nv-col"></div></div>' },
+  { id:'nv-row4', label:'4 Columns', category:'Layout', icon:'fa-th', content:'<div class="nv-row"><div class="nv-col"></div><div class="nv-col"></div><div class="nv-col"></div><div class="nv-col"></div></div>' },
+  { id:'nv-spacer', label:'Spacer', category:'Layout', icon:'fa-arrows-up-down', content:'<div class="nv-spacer" style="height:40px;"></div>' },
+  { id:'nv-divider', label:'Divider', category:'Layout', icon:'fa-minus', content:'<hr class="nv-divider"/>' },
+
+  // --- BASIC ---
+  { id:'nv-heading', label:'Heading', category:'Basic', icon:'fa-heading', content:'<h2 data-gjs-type="text">Add Your Heading Here</h2>' },
+  { id:'nv-text', label:'Text', category:'Basic', icon:'fa-align-left', content:'<p data-gjs-type="text">This is a rich text block. Double click to edit it. You can build sections, columns, and custom pages.</p>' },
+  { id:'nv-button', label:'Button', category:'Basic', icon:'fa-hand-pointer', content:'<button class="nv-btn">Click Me</button>' },
+  { id:'nv-image', label:'Image', category:'Basic', icon:'fa-image', content:{type:'image', style:{'max-width':'100%', 'border-radius':'8px'}}, activate:true },
+  { id:'nv-video', label:'Video', category:'Basic', icon:'fa-play', content:'<iframe width="100%" height="400" style="border:0;border-radius:12px;" src="https://www.youtube.com/embed/dQw4w9WgXcQ" allowfullscreen></iframe>' },
+  { id:'nv-badge', label:'Badge', category:'Basic', icon:'fa-tag', content:'<span class="nv-badge">New Release</span>' },
+  { id:'nv-list', label:'Bullet List', category:'Basic', icon:'fa-list', content:'<ul data-gjs-type="text"><li>First point</li><li>Second point</li></ul>' },
+  
+  // --- COMPONENTS ---
+  { id:'nv-card', label:'Image Card', category:'Components', icon:'fa-address-card', content:'<div class="nv-card"><img src="https://images.unsplash.com/photo-1498050108023-c5249f4df085?w=600&q=80"/><div class="nv-card-body"><h4>Card Title</h4><p>A short description of the content inside this card. Great for blogs or features.</p><button class="nv-btn outline rounded">Read More</button></div></div>' },
+  { id:'nv-icon-box', label:'Icon Box Center', category:'Components', icon:'fa-star', content:'<div class="nv-icon-box"><div class="ic"><i class="fa-solid fa-bolt"></i></div><h4>Lightning Fast</h4><p>Explain the benefit of this feature briefly.</p></div>' },
+  { id:'nv-icon-box-left', label:'Icon Box Left', category:'Components', icon:'fa-star-half-stroke', content:'<div class="nv-icon-box left"><div class="ic"><i class="fa-solid fa-shield"></i></div><h4>Secure by Default</h4><p>Explain the benefit of this feature briefly.</p></div>' },
+  { id:'nv-icon-list', label:'Icon List', category:'Components', icon:'fa-list-check', content:'<ul class="nv-icon-list"><li><i class="fa-solid fa-check"></i> Unlimited projects</li><li><i class="fa-solid fa-check"></i> 24/7 Support</li></ul>' },
+  { id:'nv-testimonial', label:'Testimonial', category:'Components', icon:'fa-comment', content:'<div class="nv-testimonial"><div class="quote">“This builder is absolutely incredible. It saved us hundreds of hours.”</div><div class="who"><img src="https://i.pravatar.cc/100?img=12"/><div><b>Sarah Jenkins</b><span>Design Lead</span></div></div></div>' },
+  { id:'nv-team', label:'Team Member', category:'Components', icon:'fa-user', content:'<div class="nv-team"><img src="https://i.pravatar.cc/200?img=33"/><h4>Michael Scott</h4><span>Regional Manager</span></div>' },
+  { id:'nv-counter', label:'Counter', category:'Components', icon:'fa-hashtag', content:'<div class="nv-counter" data-end="99"><div class="num">0</div><div class="lbl">Projects Completed</div></div>' },
+  { id:'nv-pricing', label:'Pricing Card', category:'Components', icon:'fa-money-bill', content:'<div class="nv-price-card"><h3>Pro Plan</h3><div class="amt">$29<span>/mo</span></div><ul><li><i class="fa-solid fa-check"></i> 10 Projects</li><li><i class="fa-solid fa-check"></i> Priority Support</li></ul><button class="nv-btn rounded" style="width:100%;">Get Started</button></div>' },
+  { id:'nv-accordion', label:'FAQ Accordion', category:'Components', icon:'fa-layer-group', content:'<div class="nv-accordion" data-single="true"><div class="nv-accordion-item open"><div class="nv-accordion-header">What is included? <i class="fa-solid fa-chevron-down car"></i></div><div class="nv-accordion-body"><div class="nv-accordion-body-inner">Everything you need to build amazing pages.</div></div></div><div class="nv-accordion-item"><div class="nv-accordion-header">Can I cancel anytime? <i class="fa-solid fa-chevron-down car"></i></div><div class="nv-accordion-body"><div class="nv-accordion-body-inner">Yes, there are no long-term contracts.</div></div></div></div>' },
+  { id:'nv-form-contact', label:'Contact Form', category:'Components', icon:'fa-envelope', content:'<form class="nv-form"><label>Name</label><input type="text" placeholder="John Doe"/><label>Email</label><input type="email" placeholder="john@example.com"/><label>Message</label><textarea rows="4" placeholder="How can we help?"></textarea><button type="button" class="nv-btn">Send Message</button></form>' },
+  { id:'nv-form-login', label:'Login Form', category:'Components', icon:'fa-lock', content:'<form class="nv-form" style="background:#fff;padding:30px;border-radius:12px;border:1px solid var(--border);"><h3 style="margin-top:0;">Welcome Back</h3><label>Email</label><input type="email" placeholder="you@example.com"/><label>Password</label><input type="password" placeholder="••••••••"/><button type="button" class="nv-btn" style="width:100%;margin-top:10px;">Sign In</button></form>' },
+
+  // --- SECTIONS ---
+  { id:'nv-sec-hero-1', label:'Hero Centered', category:'Sections', icon:'fa-star-of-life', content:'<section class="nv-hero"><span class="nv-badge">V2.0 is Live</span><h1>Build better websites, faster.</h1><p>The ultimate visual editor for creators who want total control without the code.</p><div style="display:flex;gap:16px;justify-content:center;"><button class="nv-btn rounded">Start Free Trial</button><button class="nv-btn outline rounded">View Demo</button></div></section>' },
+  { id:'nv-sec-hero-2', label:'Hero Split', category:'Sections', icon:'fa-table-columns', content:'<section class="nv-section" style="background:#f7f7fb;"><div class="nv-container"><div class="nv-row" style="align-items:center;"><div class="nv-col" style="flex:1.2;"><span class="nv-badge">New Release</span><h1>Create designs effortlessly.</h1><p>Drag, drop, and publish. It is that simple to build your next big idea.</p><button class="nv-btn">Get Started Now</button></div><div class="nv-col"><img src="https://images.unsplash.com/photo-1498050108023-c5249f4df085?w=800&q=80"></div></div></div></section>' },
+  { id:'nv-sec-nav-1', label:'Navbar Standard', category:'Sections', icon:'fa-bars', content:'<div class="nv-navbar"><a href="#" class="brand"><i class="fa-solid fa-cube"></i> Nova</a><nav><a href="#">Features</a><a href="#">Pricing</a><a href="#">Company</a></nav><div style="display:flex;gap:12px;"><button class="nv-btn outline">Log in</button><button class="nv-btn">Sign up</button></div></div>' },
+  { id:'nv-sec-features-1', label:'Features Grid', category:'Sections', icon:'fa-border-all', content:'<section class="nv-section"><div class="nv-container"><div style="text-align:center;max-width:600px;margin:0 auto 50px;"><span class="nv-badge">Features</span><h2>Everything you need.</h2></div><div class="nv-row"><div class="nv-col nv-icon-box"><div class="ic"><i class="fa-solid fa-bolt"></i></div><h4>Fast Performance</h4><p>Optimized for speed and SEO out of the box.</p></div><div class="nv-col nv-icon-box"><div class="ic"><i class="fa-solid fa-mobile-screen"></i></div><h4>100% Responsive</h4><p>Looks beautiful on every device size.</p></div><div class="nv-col nv-icon-box"><div class="ic"><i class="fa-solid fa-lock"></i></div><h4>Secure Hosting</h4><p>Enterprise-grade security included.</p></div></div></div></section>' },
+];
+
+/* =========================================================================
+   INIT GRAPESJS
+   ========================================================================= */
+var runtimeCssUrl = 'data:text/css;charset=utf-8,' + encodeURIComponent(RUNTIME_CSS);
+var runtimeJsUrl = 'data:text/javascript;charset=utf-8,' + encodeURIComponent(RUNTIME_JS);
+
+var editor = grapesjs.init({
+  container: '#gjs',
+  height: '100%', width: 'auto', fromElement: false, showOffsets: true, noticeOnUnload: false, avoidInlineStyle: true,
+  storageManager: false, // Disabling default storage manager to handle it via our custom project manager
+  deviceManager: {
+    devices: [
+      { name: 'Desktop', width: '' },
+      { name: 'Tablet', width: '768px', widthMedia: '992px' },
+      { name: 'Mobile landscape', width: '568px', widthMedia: '768px' },
+      { name: 'Mobile portrait', width: '320px', widthMedia: '480px' },
+    ],
+  },
+  panels: { defaults: [] },
+  blockManager: { appendTo: '#blocks-container', blocks: [] },
+  layerManager: { appendTo: '#layers-container' },
+  selectorManager: { appendTo: '#gjs-am-hidden' },
+  traitManager: { appendTo: '#traits-container' },
+  assetManager: {
+    appendTo: '#gjs-am-hidden',
+    embedAsBase64: true,
+    upload: false,
+    autoAdd: true,
+    assets: [],
+  },
+  canvas: {
+    styles: [
+      'https://fonts.googleapis.com/css2?family=Sora:wght@400;600;700;800&family=Inter:wght@400;500;600;700&display=swap',
+      'https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css',
+      runtimeCssUrl,
+    ],
+    scripts: [ runtimeJsUrl ],
+  },
+  styleManager: { appendTo: '#gjs-am-hidden' },
+});
+
+/* =========================================================================
+   NV STYLE SECTIONS — data source for the fully custom Style Manager
+   renderer (see nvRenderStyleManager below). We no longer hand this to
+   GrapesJS's own styleManager config; we read/write styles ourselves via
+   editor.StyleManager.getSelected()/addStyleTargets(), which correctly
+   resolves to a class-based CSS Rule (global) when the selected element has
+   classes, or to the component itself (local) when it doesn't — see the
+   "global/local" dot on each row.
+   ========================================================================= */
+var ICONROW_OPTS = {
+  display: [
+    {value:'block', icon:'fa-square', label:'Block'},
+    {value:'flex', icon:'fa-arrows-left-right', label:'Flex'},
+    {value:'inline-block', icon:'fa-text-width', label:'Inline block'},
+    {value:'inline', icon:'fa-i-cursor', label:'Inline'},
+    {value:'grid', icon:'fa-table-cells', label:'Grid'},
+    {value:'none', icon:'fa-eye-slash', label:'None'},
+  ],
+  'flex-direction': [
+    {value:'row', icon:'fa-arrow-right', label:'Row'},
+    {value:'row-reverse', icon:'fa-arrow-left', label:'Row reverse'},
+    {value:'column', icon:'fa-arrow-down', label:'Column'},
+    {value:'column-reverse', icon:'fa-arrow-up', label:'Column reverse'},
+  ],
+  'justify-content': [
+    {value:'flex-start', icon:'fa-align-left', label:'Start'},
+    {value:'center', icon:'fa-align-center', label:'Center'},
+    {value:'flex-end', icon:'fa-align-right', label:'End'},
+    {value:'space-between', icon:'fa-arrows-left-right-to-line', label:'Space between'},
+    {value:'space-around', icon:'fa-arrows-left-right', label:'Space around'},
+    {value:'space-evenly', icon:'fa-grip-lines-vertical', label:'Space evenly'},
+  ],
+  'align-items': [
+    {value:'stretch', icon:'fa-up-down', label:'Stretch'},
+    {value:'flex-start', icon:'fa-align-left fa-rotate-90', label:'Start'},
+    {value:'center', icon:'fa-align-center fa-rotate-90', label:'Center'},
+    {value:'flex-end', icon:'fa-align-right fa-rotate-90', label:'End'},
+    {value:'baseline', icon:'fa-grip-lines', label:'Baseline'},
+  ],
+  'flex-wrap': [
+    {value:'nowrap', icon:'fa-arrow-right', label:'No wrap'},
+    {value:'wrap', icon:'fa-turn-down', label:'Wrap'},
+    {value:'wrap-reverse', icon:'fa-turn-up', label:'Wrap reverse'},
+  ],
+  'align-content': [
+    {value:'flex-start', icon:'fa-align-left fa-rotate-90', label:'Start'},
+    {value:'center', icon:'fa-align-center fa-rotate-90', label:'Center'},
+    {value:'flex-end', icon:'fa-align-right fa-rotate-90', label:'End'},
+    {value:'space-between', icon:'fa-arrows-left-right-to-line', label:'Space between'},
+    {value:'space-around', icon:'fa-arrows-left-right', label:'Space around'},
+    {value:'stretch', icon:'fa-up-down', label:'Stretch'},
+  ],
+  'text-align': [
+    {value:'left', icon:'fa-align-left', label:'Left'},
+    {value:'center', icon:'fa-align-center', label:'Center'},
+    {value:'right', icon:'fa-align-right', label:'Right'},
+    {value:'justify', icon:'fa-align-justify', label:'Justify'},
+  ],
+  'text-decoration': [
+    {value:'none', icon:'fa-minus', label:'None'},
+    {value:'underline', icon:'fa-underline', label:'Underline'},
+    {value:'line-through', icon:'fa-strikethrough', label:'Line through'},
+  ],
+  'border-style': [
+    {value:'none', icon:'fa-minus', label:'None'},
+    {value:'solid', icon:'fa-grip-lines', label:'Solid'},
+    {value:'dashed', icon:'fa-ellipsis', label:'Dashed'},
+    {value:'dotted', icon:'fa-ellipsis-vertical fa-rotate-90', label:'Dotted'},
+  ],
+};
+
+var NV_STYLE_SECTIONS = [
+  { id:'quick', name:'Quick', icon:'fa-bolt', open:true, properties:[
+      { property:'display', label:'Display', type:'icon-row', defaults:'block' },
+      { property:'flex-direction', label:'Direction', type:'icon-row', defaults:'row', flexOnly:true },
+      { property:'justify-content', label:'Justify', type:'icon-row', defaults:'flex-start', flexOnly:true },
+      { property:'align-items', label:'Align', type:'icon-row', defaults:'stretch', flexOnly:true },
+      { property:'gap', label:'Gap', type:'number', units:['px','%','rem'], defaults:'0', flexOnly:true },
+      { property:'background-color', label:'Background', type:'color' },
+      { property:'color', label:'Text color', type:'color' },
+  ]},
+  { id:'layout', name:'Layout', icon:'fa-table-cells-large', open:false, properties:[
+      { property:'display', label:'Display', type:'icon-row', defaults:'block' },
+      { property:'flex-direction', label:'Direction', type:'icon-row', defaults:'row', flexOnly:true },
+      { property:'flex-wrap', label:'Wrap', type:'icon-row', defaults:'nowrap', flexOnly:true },
+      { property:'justify-content', label:'Justify content', type:'icon-row', defaults:'flex-start', flexOnly:true },
+      { property:'align-items', label:'Align items', type:'icon-row', defaults:'stretch', flexOnly:true },
+      { property:'align-content', label:'Align content', type:'icon-row', defaults:'flex-start', flexOnly:true },
+      { property:'gap', label:'Gap', type:'number', units:['px','%','rem'], defaults:'0', flexOnly:true },
+      { property:'position', label:'Position', type:'select', defaults:'static', options:[{value:'static',name:'Default'},{value:'relative',name:'Relative'},{value:'absolute',name:'Absolute'},{value:'fixed',name:'Fixed'},{value:'sticky',name:'Sticky'}] },
+      { property:'top', label:'Top', type:'number', units:['px','%','auto'], defaults:'auto' },
+      { property:'right', label:'Right', type:'number', units:['px','%','auto'], defaults:'auto' },
+      { property:'bottom', label:'Bottom', type:'number', units:['px','%','auto'], defaults:'auto' },
+      { property:'left', label:'Left', type:'number', units:['px','%','auto'], defaults:'auto' },
+      { property:'z-index', label:'Z-index', type:'number', defaults:'auto' },
+      { property:'overflow', label:'Overflow', type:'select', defaults:'visible', options:[{value:'visible',name:'Visible'},{value:'hidden',name:'Hidden'},{value:'scroll',name:'Scroll'},{value:'auto',name:'Auto'}] },
+  ]},
+  { id:'size', name:'Size', icon:'fa-expand', open:false, properties:[
+      { property:'width', label:'Width', type:'number', units:['px','%','vw','auto'], defaults:'auto' },
+      { property:'min-width', label:'Min width', type:'number', units:['px','%','vw','auto'], defaults:'auto' },
+      { property:'max-width', label:'Max width', type:'number', units:['px','%','vw','none'], defaults:'none' },
+      { property:'height', label:'Height', type:'number', units:['px','%','vh','auto'], defaults:'auto' },
+      { property:'min-height', label:'Min height', type:'number', units:['px','%','vh','auto'], defaults:'auto' },
+      { property:'max-height', label:'Max height', type:'number', units:['px','%','vh','none'], defaults:'none' },
+      { property:'aspect-ratio', label:'Aspect ratio', type:'select', defaults:'auto', options:[{value:'auto',name:'Auto'},{value:'1 / 1',name:'1:1'},{value:'4 / 3',name:'4:3'},{value:'16 / 9',name:'16:9'},{value:'3 / 2',name:'3:2'},{value:'2 / 3',name:'2:3'}] },
+  ]},
+  { id:'spacing', name:'Spacing', icon:'fa-arrows-up-down-left-right', open:false, properties:[
+      { property:'margin', label:'Margin', type:'composite', sides:['top','right','bottom','left'], units:['px','%','rem','em'], defaults:'0' },
+      { property:'padding', label:'Padding', type:'composite', sides:['top','right','bottom','left'], units:['px','%','rem','em'], defaults:'0' },
+  ]},
+  { id:'typography', name:'Typography', icon:'fa-font', open:false, properties:[
+      { property:'font-family', label:'Font', type:'select', defaults:'Inter, sans-serif', options:[{value:'Inter, sans-serif', name:'Inter'},{value:'Sora, sans-serif', name:'Sora'},{value:'Arial, sans-serif', name:'Arial'},{value:'Georgia, serif', name:'Georgia'}] },
+      { property:'font-size', label:'Font size', type:'number', units:['px','em','rem','%'] },
+      { property:'font-weight', label:'Weight', type:'select', defaults:'400', options:[{value:'300',name:'Light'},{value:'400',name:'Regular'},{value:'500',name:'Medium'},{value:'600',name:'Semibold'},{value:'700',name:'Bold'},{value:'800',name:'Extrabold'}] },
+      { property:'line-height', label:'Line height', type:'number', units:['','px','em'], defaults:'normal' },
+      { property:'letter-spacing', label:'Letter spacing', type:'number', units:['px','em'], defaults:'normal' },
+      { property:'color', label:'Color', type:'color' },
+      { property:'text-align', label:'Align', type:'icon-row', defaults:'left' },
+      { property:'text-decoration', label:'Decoration', type:'icon-row', defaults:'none' },
+      { property:'text-transform', label:'Transform', type:'select', defaults:'none', options:[{value:'none',name:'None'},{value:'uppercase',name:'Uppercase'},{value:'lowercase',name:'Lowercase'},{value:'capitalize',name:'Capitalize'}] },
+  ]},
+  { id:'background', name:'Background', icon:'fa-fill-drip', open:false, properties:[
+      { property:'background-color', label:'Color', type:'color' },
+      { property:'background-image', label:'Image', type:'image-picker' },
+      { property:'background-size', label:'Size', type:'select', defaults:'auto', options:[{value:'auto',name:'Auto'},{value:'cover',name:'Cover'},{value:'contain',name:'Contain'}] },
+      { property:'background-position', label:'Position', type:'select', defaults:'center center', options:[{value:'center center',name:'Center'},{value:'top center',name:'Top'},{value:'bottom center',name:'Bottom'},{value:'center left',name:'Left'},{value:'center right',name:'Right'}] },
+      { property:'background-repeat', label:'Repeat', type:'select', defaults:'no-repeat', options:[{value:'no-repeat',name:'No repeat'},{value:'repeat',name:'Repeat'},{value:'repeat-x',name:'Repeat X'},{value:'repeat-y',name:'Repeat Y'}] },
+  ]},
+  { id:'border', name:'Border & Radius', icon:'fa-border-all', open:false, properties:[
+      { property:'border-style', label:'Style', type:'icon-row', defaults:'none' },
+      { property:'border-width', label:'Width', type:'composite', sides:['top','right','bottom','left'], sideProp:function(s){ return 'border-'+s+'-width'; }, units:['px'], defaults:'0' },
+      { property:'border-color', label:'Color', type:'color' },
+      { property:'border-radius', label:'Radius', type:'composite', corners:true, sides:['top-left','top-right','bottom-right','bottom-left'], sideLabels:['Top L','Top R','Bot R','Bot L'], units:['px','%'], defaults:'0' },
+  ]},
+  { id:'effects', name:'Effects', icon:'fa-wand-magic-sparkles', open:false, properties:[
+      { property:'opacity', label:'Opacity', type:'slider', defaults:1, min:0, max:1, step:0.01 },
+      { property:'box-shadow', label:'Shadow', type:'shadow-builder' },
+      { property:'filter', label:'Filter', type:'filter-builder' },
+      { property:'mix-blend-mode', label:'Blend mode', type:'select', defaults:'normal', options:[{value:'normal',name:'Normal'},{value:'multiply',name:'Multiply'},{value:'screen',name:'Screen'},{value:'overlay',name:'Overlay'},{value:'darken',name:'Darken'},{value:'lighten',name:'Lighten'}] },
+      { property:'transform', label:'Transform', type:'transform-builder' },
+      { property:'transition', label:'Transition', type:'text', defaults:'none' },
+      { property:'cursor', label:'Cursor', type:'select', defaults:'auto', options:[{value:'auto',name:'Auto'},{value:'pointer',name:'Pointer'},{value:'default',name:'Default'},{value:'text',name:'Text'},{value:'move',name:'Move'},{value:'not-allowed',name:'Not allowed'}] },
+  ]},
+];
+
+/* ---- Register blocks ---- */
+blocks.forEach(function(b){
+  editor.BlockManager.add(b.id, {
+    label: '<i class="fa-solid '+(b.icon||'fa-cube')+'"></i><div class="gjs-block-label">'+b.label+'</div>',
+    category: b.category, content: b.content, attributes: { 'data-label': b.label.toLowerCase() }
+  });
+});
+
+/* =========================================================================
+   CUSTOM STYLE MANAGER — replaces GrapesJS's default Style Manager render.
+   Reads/writes via the public API (editor.StyleManager.getSelected() /
+   addStyleTargets()), which correctly resolves to a class-based CSS Rule
+   (shared/"global") when the selected element has classes applied, or to
+   the component itself ("local", one-off) when it doesn't. That resolution
+   is also what drives the global/local dot on each row.
+   ========================================================================= */
+var NV_STYLE_SECTION_STATE = {}; // id -> open/closed, seeded from NV_STYLE_SECTIONS below
+NV_STYLE_SECTIONS.forEach(function(s){ NV_STYLE_SECTION_STATE[s.id] = !!s.open; });
+
+function nvStyleTarget(){
+  return editor.StyleManager.getSelected();
+}
+function nvIsGlobalTarget(){
+  var cmp = editor.getSelected();
+  return !!(cmp && typeof cmp.getClasses === 'function' && cmp.getClasses().length > 0);
+}
+function nvGetStyleVal(prop, fallback){
+  var t = nvStyleTarget();
+  if (!t) return fallback;
+  var style = t.getStyle ? t.getStyle() : {};
+  var v = style[prop];
+  return (v === undefined || v === null || v === '') ? fallback : v;
+}
+function nvSetStyle(obj){
+  editor.StyleManager.addStyleTargets(obj);
+  nvRenderStyleManager();
+  if (window.saveTimeout) clearTimeout(window.saveTimeout);
+  window.saveTimeout = setTimeout(function(){ saveCurrentProjectState(); document.getElementById('save-status').textContent = 'Saved'; }, 800);
+}
+function nvSplitVal(raw, defaultUnit){
+  raw = (raw === undefined || raw === null) ? '' : String(raw);
+  var m = /^(-?[\d.]+)\s*([a-z%]*)$/i.exec(raw.trim());
+  if (m) return { num: m[1], unit: m[2] || defaultUnit || '' };
+  return { num: '', unit: defaultUnit || '' };
+}
+
+function nvIsFlexActive(){
+  var d = nvGetStyleVal('display', 'block');
+  return d === 'flex' || d === 'inline-flex';
+}
+
+function nvRenderStyleManager(){
+  var container = document.getElementById('styles-container');
+  if (!container) return;
+  var scrollTop = container.scrollTop;
+  var cmp = editor.getSelected();
+  container.innerHTML = '';
+  if (!cmp) { container.innerHTML = '<div class="nv-cls-empty" style="padding:14px;">Select an element to edit its style.</div>'; return; }
+
+  var isGlobal = nvIsGlobalTarget();
+  var flexActive = nvIsFlexActive();
+
+  NV_STYLE_SECTIONS.forEach(function(section){
+    var sec = document.createElement('div');
+    sec.className = 'nv-sm-section' + (NV_STYLE_SECTION_STATE[section.id] ? ' open' : '');
+
+    var head = document.createElement('div');
+    head.className = 'nv-sm-head';
+    head.innerHTML = '<i class="fa-solid ' + section.icon + '"></i><span>' + section.name + '</span><i class="fa-solid fa-chevron-down nv-sm-chev"></i>';
+    head.onclick = function(){
+      NV_STYLE_SECTION_STATE[section.id] = !NV_STYLE_SECTION_STATE[section.id];
+      sec.classList.toggle('open', NV_STYLE_SECTION_STATE[section.id]);
+    };
+    sec.appendChild(head);
+
+    var body = document.createElement('div');
+    body.className = 'nv-sm-body';
+
+    section.properties.forEach(function(propDef){
+      var disabled = propDef.flexOnly && !flexActive;
+      body.appendChild(nvRenderPropRow(propDef, isGlobal, disabled));
+    });
+
+    sec.appendChild(body);
+    container.appendChild(sec);
+  });
+  container.scrollTop = scrollTop;
+}
+
+function nvMakeDot(isGlobal, isSet){
+  var dot = document.createElement('span');
+  dot.className = 'nv-style-dot' + (isSet ? (isGlobal ? ' global' : ' local') : '');
+  dot.title = !isSet ? 'Not set (inherited)' : (isGlobal ? 'Global — shared via class, affects every element with this class' : 'Local — set on this element only');
+  return dot;
+}
+
+function nvRenderPropRow(propDef, isGlobal, disabled){
+  var row = document.createElement('div');
+  row.className = 'nv-sm-row nv-sm-row--' + propDef.type + (disabled ? ' disabled' : '');
+
+  var labelWrap = document.createElement('div');
+  labelWrap.className = 'nv-sm-label-wrap';
+  var isSet = propDef.type === 'composite'
+    ? propDef.sides.some(function(s){ return nvGetStyleVal(propDef.sideProp ? propDef.sideProp(s) : (propDef.property + '-' + s)) !== undefined; })
+    : (nvGetStyleVal(propDef.property) !== undefined);
+  labelWrap.appendChild(nvMakeDot(isGlobal, isSet));
+  var label = document.createElement('label');
+  label.textContent = propDef.label;
+  labelWrap.appendChild(label);
+  row.appendChild(labelWrap);
+
+  var field = document.createElement('div');
+  field.className = 'nv-sm-field';
+  field.appendChild(nvBuildControl(propDef, disabled));
+  row.appendChild(field);
+
+  return row;
+}
+
+function nvBuildControl(propDef, disabled){
+  switch(propDef.type){
+    case 'icon-row': return nvControlIconRow(propDef, disabled);
+    case 'select': return nvControlSelect(propDef, disabled);
+    case 'number': return nvControlNumber(propDef, disabled);
+    case 'color': return nvControlColor(propDef, disabled);
+    case 'slider': return nvControlSlider(propDef, disabled);
+    case 'text': return nvControlText(propDef, disabled);
+    case 'composite': return nvControlComposite(propDef, disabled);
+    case 'image-picker': return nvControlImagePicker(propDef, disabled);
+    case 'shadow-builder': return nvControlShadowBuilder(propDef, disabled);
+    case 'filter-builder': return nvControlFilterBuilder(propDef, disabled);
+    case 'transform-builder': return nvControlTransformBuilder(propDef, disabled);
+    default: return document.createElement('div');
+  }
+}
+
+function nvControlIconRow(propDef, disabled){
+  var wrap = document.createElement('div');
+  wrap.className = 'nv-icon-row';
+  var opts = ICONROW_OPTS[propDef.property] || [];
+  var current = nvGetStyleVal(propDef.property, propDef.defaults);
+  opts.forEach(function(opt){
+    var btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'nv-icon-btn' + (opt.value === current ? ' active' : '');
+    btn.title = opt.label;
+    btn.innerHTML = '<i class="fa-solid ' + opt.icon + '"></i>';
+    btn.disabled = !!disabled;
+    btn.onclick = function(){
+      var o = {}; o[propDef.property] = opt.value;
+      nvSetStyle(o);
+    };
+    wrap.appendChild(btn);
+  });
+  return wrap;
+}
+
+function nvControlSelect(propDef, disabled){
+  var sel = document.createElement('select');
+  sel.disabled = !!disabled;
+  var current = nvGetStyleVal(propDef.property, propDef.defaults);
+  (propDef.options || []).forEach(function(o){
+    var opt = document.createElement('option');
+    opt.value = o.value; opt.textContent = o.name;
+    if (o.value === current) opt.selected = true;
+    sel.appendChild(opt);
+  });
+  sel.onchange = function(){
+    var o = {}; o[propDef.property] = sel.value;
+    nvSetStyle(o);
+  };
+  return sel;
+}
+
+function nvControlNumber(propDef, disabled){
+  var wrap = document.createElement('div');
+  wrap.className = 'nv-num-wrap';
+  var raw = nvGetStyleVal(propDef.property, propDef.defaults || '');
+  var parts = nvSplitVal(raw, (propDef.units && propDef.units[0]) || '');
+  var input = document.createElement('input');
+  input.type = 'text';
+  input.inputMode = 'decimal';
+  input.value = parts.num;
+  input.disabled = !!disabled;
+  input.placeholder = raw === 'auto' || raw === 'none' || raw === 'normal' ? raw : '';
+  wrap.appendChild(input);
+
+  function commit(){
+    var val = input.value.trim();
+    if (val === '') { var o = {}; o[propDef.property] = ''; nvSetStyle(o); return; }
+    var unit = unitSel ? unitSel.value : (parts.unit || '');
+    var o = {}; o[propDef.property] = val + unit;
+    nvSetStyle(o);
+  }
+  input.onchange = commit;
+  input.onkeydown = function(e){ if (e.key === 'Enter') { e.preventDefault(); commit(); } };
+
+  var unitSel = null;
+  if (propDef.units && propDef.units.length) {
+    unitSel = document.createElement('select');
+    unitSel.className = 'nv-unit-sel';
+    unitSel.disabled = !!disabled;
+    propDef.units.forEach(function(u){
+      var opt = document.createElement('option');
+      opt.value = u; opt.textContent = u || '—';
+      if (u === parts.unit) opt.selected = true;
+      unitSel.appendChild(opt);
+    });
+    unitSel.onchange = function(){
+      if (['auto','none','normal'].indexOf(unitSel.value) > -1) { var o = {}; o[propDef.property] = unitSel.value; nvSetStyle(o); return; }
+      commit();
+    };
+    wrap.appendChild(unitSel);
+  }
+  return wrap;
+}
+
+function nvControlColor(propDef, disabled){
+  var wrap = document.createElement('div');
+  wrap.className = 'nv-color-wrap';
+  var raw = nvGetStyleVal(propDef.property, '#000000');
+  var swatch = document.createElement('input');
+  swatch.type = 'color';
+  var hexGuess = /^#([0-9a-f]{3}|[0-9a-f]{6})$/i.test(raw) ? raw : '#000000';
+  swatch.value = hexGuess;
+  swatch.disabled = !!disabled;
+  var text = document.createElement('input');
+  text.type = 'text';
+  text.value = raw;
+  text.disabled = !!disabled;
+  swatch.oninput = function(){ text.value = swatch.value; var o = {}; o[propDef.property] = swatch.value; nvSetStyle(o); };
+  text.onchange = function(){ var o = {}; o[propDef.property] = text.value.trim(); nvSetStyle(o); };
+  wrap.appendChild(swatch); wrap.appendChild(text);
+  return wrap;
+}
+
+function nvControlSlider(propDef, disabled){
+  var wrap = document.createElement('div');
+  wrap.className = 'nv-slider-wrap';
+  var raw = nvGetStyleVal(propDef.property, propDef.defaults);
+  var val = parseFloat(raw); if (isNaN(val)) val = propDef.defaults;
+  var input = document.createElement('input');
+  input.type = 'range';
+  input.min = propDef.min; input.max = propDef.max; input.step = propDef.step;
+  input.value = val;
+  input.disabled = !!disabled;
+  var out = document.createElement('span'); out.className = 'nv-slider-val'; out.textContent = val;
+  input.oninput = function(){ out.textContent = input.value; };
+  input.onchange = function(){ var o = {}; o[propDef.property] = input.value; nvSetStyle(o); };
+  wrap.appendChild(input); wrap.appendChild(out);
+  return wrap;
+}
+
+function nvControlText(propDef, disabled){
+  var input = document.createElement('input');
+  input.type = 'text';
+  input.value = nvGetStyleVal(propDef.property, propDef.defaults || '');
+  input.disabled = !!disabled;
+  input.onchange = function(){ var o = {}; o[propDef.property] = input.value.trim(); nvSetStyle(o); };
+  return input;
+}
+
+function nvControlComposite(propDef, disabled){
+  var wrap = document.createElement('div');
+  wrap.className = 'nv-composite' + (propDef.corners ? ' nv-composite--corners' : '');
+  var sideProps = propDef.sides.map(function(s){ return propDef.sideProp ? propDef.sideProp(s) : (propDef.property + '-' + s); });
+  var vals = sideProps.map(function(p){ return nvSplitVal(nvGetStyleVal(p, propDef.defaults), propDef.units[0]).num; });
+  var allSame = vals.every(function(v){ return v === vals[0]; });
+  var uniform = allSame;
+
+  var modes = document.createElement('div');
+  modes.className = 'nv-space-modes';
+  modes.innerHTML = '<button type="button" data-mode="uniform" title="All sides equal"><i class="fa-solid fa-square"></i></button><button type="button" data-mode="custom" title="Edit each side"><i class="fa-regular fa-square"></i></button>';
+  wrap.appendChild(modes);
+
+  var grid = document.createElement('div');
+  grid.className = 'nv-composite-grid';
+  wrap.appendChild(grid);
+
+  var sideLabels = propDef.sideLabels || ['Top','Right','Bottom','Left'];
+  var inputs = [];
+  sideProps.forEach(function(p, i){
+    var cell = document.createElement('div');
+    cell.className = 'nv-composite-cell nv-composite-cell--' + i;
+    var lab = document.createElement('span'); lab.className = 'nv-composite-lab'; lab.textContent = sideLabels[i];
+    var inp = document.createElement('input');
+    inp.type = 'text'; inp.inputMode = 'decimal';
+    inp.value = nvSplitVal(nvGetStyleVal(p, propDef.defaults), propDef.units[0]).num;
+    inp.disabled = !!disabled;
+    inputs.push(inp);
+    cell.appendChild(lab); cell.appendChild(inp);
+    grid.appendChild(cell);
+  });
+
+  var unit = propDef.units[0];
+  var unitSel = null;
+  if (propDef.units.length > 1) {
+    unitSel = document.createElement('select');
+    unitSel.className = 'nv-unit-sel';
+    propDef.units.forEach(function(u){ var o=document.createElement('option'); o.value=u; o.textContent=u; unitSel.appendChild(o); });
+    unitSel.value = unit;
+    unitSel.onchange = function(){ unit = unitSel.value; commitAll(); };
+    wrap.appendChild(unitSel);
+  }
+
+  function commitAll(){
+    var o = {};
+    inputs.forEach(function(inp, i){
+      var v = inp.value.trim();
+      o[sideProps[i]] = v === '' ? '' : v + unit;
+    });
+    nvSetStyle(o);
+  }
+  function applyUniformVisual(){
+    wrap.classList.toggle('nv-uniform', uniform);
+    modes.querySelectorAll('button').forEach(function(b){ b.classList.toggle('active', b.getAttribute('data-mode') === (uniform ? 'uniform' : 'custom')); });
+  }
+  applyUniformVisual();
+
+  inputs.forEach(function(inp, i){
+    inp.onchange = function(){
+      if (uniform) { inputs.forEach(function(o){ o.value = inp.value; }); }
+      commitAll();
+    };
+  });
+  modes.querySelectorAll('button').forEach(function(btn){
+    btn.onclick = function(){
+      uniform = btn.getAttribute('data-mode') === 'uniform';
+      if (uniform) { var v = inputs[0].value; inputs.forEach(function(inp){ inp.value = v; }); commitAll(); }
+      applyUniformVisual();
+    };
+  });
+
+  return wrap;
+}
+
+function nvControlImagePicker(propDef, disabled){
+  var wrap = document.createElement('div');
+  wrap.className = 'nv-image-picker';
+  var raw = nvGetStyleVal(propDef.property, '');
+  var m = /url\(["']?(.*?)["']?\)/.exec(raw || '');
+  var url = m ? m[1] : '';
+  var preview = document.createElement('div');
+  preview.className = 'nv-image-preview';
+  if (url) preview.style.backgroundImage = "url('" + url.replace(/'/g,'%27') + "')";
+  var btn = document.createElement('button');
+  btn.type = 'button'; btn.className = 'btn';
+  btn.textContent = url ? 'Change image' : 'Choose image';
+  btn.disabled = !!disabled;
+  btn.onclick = function(){
+    nvBgPicking = true;
+    document.getElementById('library-pick-banner').classList.add('show');
+    nvGoToPage('page-library');
+  };
+  var clearBtn = null;
+  if (url) {
+    clearBtn = document.createElement('button');
+    clearBtn.type = 'button'; clearBtn.className = 'nv-asset-del'; clearBtn.innerHTML = '<i class="fa-solid fa-xmark"></i>';
+    clearBtn.title = 'Remove image';
+    clearBtn.onclick = function(){ var o = {}; o[propDef.property] = ''; nvSetStyle(o); };
+  }
+  wrap.appendChild(preview); wrap.appendChild(btn);
+  if (clearBtn) wrap.appendChild(clearBtn);
+  return wrap;
+}
+
+/* ---- Effects: structured builders (compose one CSS string behind the scenes) ---- */
+function nvControlShadowBuilder(propDef, disabled){
+  var raw = nvGetStyleVal('box-shadow', 'none');
+  var parsed = nvParseShadow(raw);
+  var wrap = document.createElement('div');
+  wrap.className = 'nv-shadow-builder';
+
+  var fields = [
+    {k:'x', label:'X', type:'num'}, {k:'y', label:'Y', type:'num'},
+    {k:'blur', label:'Blur', type:'num'}, {k:'spread', label:'Spread', type:'num'},
+  ];
+  var inputs = {};
+  fields.forEach(function(f){
+    var cell = document.createElement('div'); cell.className = 'nv-shadow-cell';
+    var lab = document.createElement('span'); lab.textContent = f.label;
+    var inp = document.createElement('input'); inp.type = 'text'; inp.inputMode='decimal'; inp.value = parsed[f.k];
+    inp.disabled = !!disabled;
+    inputs[f.k] = inp;
+    cell.appendChild(lab); cell.appendChild(inp);
+    wrap.appendChild(cell);
+  });
+  var colorInput = document.createElement('input');
+  colorInput.type = 'color'; colorInput.value = parsed.colorHex; colorInput.disabled = !!disabled;
+  inputs.color = colorInput;
+  wrap.appendChild(colorInput);
+
+  var insetLabel = document.createElement('label'); insetLabel.className = 'nv-shadow-inset';
+  var insetChk = document.createElement('input'); insetChk.type = 'checkbox'; insetChk.checked = parsed.inset; insetChk.disabled = !!disabled;
+  insetLabel.appendChild(insetChk); insetLabel.appendChild(document.createTextNode(' Inset'));
+  wrap.appendChild(insetLabel);
+
+  function commit(){
+    var val = (insetChk.checked ? 'inset ' : '') + (inputs.x.value||0) + 'px ' + (inputs.y.value||0) + 'px ' + (inputs.blur.value||0) + 'px ' + (inputs.spread.value||0) + 'px ' + colorInput.value;
+    nvSetStyle({ 'box-shadow': val });
+  }
+  [inputs.x, inputs.y, inputs.blur, inputs.spread, colorInput, insetChk].forEach(function(el){ el.onchange = commit; });
+
+  var noneBtn = document.createElement('button');
+  noneBtn.type = 'button'; noneBtn.className = 'nv-shadow-none'; noneBtn.textContent = 'None';
+  noneBtn.onclick = function(){ nvSetStyle({ 'box-shadow': 'none' }); };
+  wrap.appendChild(noneBtn);
+
+  return wrap;
+}
+function nvParseShadow(raw){
+  var out = { x:0, y:0, blur:0, spread:0, colorHex:'#000000', inset:false };
+  if (!raw || raw === 'none') return out;
+  out.inset = /inset/.test(raw);
+  var clean = raw.replace('inset','').trim();
+  var colorMatch = /(#[0-9a-f]{3,8}|rgba?\([^)]*\))/i.exec(clean);
+  if (colorMatch) {
+    var c = colorMatch[1];
+    clean = clean.replace(c, '').trim();
+    if (c[0] === '#') out.colorHex = c.length === 4 ? ('#'+c[1]+c[1]+c[2]+c[2]+c[3]+c[3]) : c.slice(0,7);
+    else out.colorHex = nvRgbToHex(c) || '#000000';
+  }
+  var nums = clean.match(/-?[\d.]+px/g) || [];
+  out.x = parseFloat(nums[0]) || 0; out.y = parseFloat(nums[1]) || 0;
+  out.blur = parseFloat(nums[2]) || 0; out.spread = parseFloat(nums[3]) || 0;
+  return out;
+}
+function nvRgbToHex(rgb){
+  var m = /rgba?\((\d+),\s*(\d+),\s*(\d+)/.exec(rgb);
+  if (!m) return null;
+  function h(n){ n=parseInt(n,10).toString(16); return n.length===1?'0'+n:n; }
+  return '#'+h(m[1])+h(m[2])+h(m[3]);
+}
+
+function nvControlFilterBuilder(propDef, disabled){
+  var raw = nvGetStyleVal('filter', 'none');
+  var parsed = nvParseFilter(raw);
+  var wrap = document.createElement('div');
+  wrap.className = 'nv-filter-builder';
+  var defs = [
+    {k:'blur', label:'Blur', min:0, max:20, unit:'px'},
+    {k:'brightness', label:'Brightness', min:0, max:200, unit:'%'},
+    {k:'contrast', label:'Contrast', min:0, max:200, unit:'%'},
+    {k:'saturate', label:'Saturate', min:0, max:200, unit:'%'},
+    {k:'grayscale', label:'Grayscale', min:0, max:100, unit:'%'},
+  ];
+  var inputs = {};
+  defs.forEach(function(d){
+    var row = document.createElement('div'); row.className = 'nv-filter-row';
+    var lab = document.createElement('span'); lab.textContent = d.label;
+    var range = document.createElement('input'); range.type = 'range'; range.min = d.min; range.max = d.max; range.value = parsed[d.k];
+    range.disabled = !!disabled;
+    var out = document.createElement('span'); out.className = 'nv-slider-val'; out.textContent = parsed[d.k] + d.unit;
+    range.oninput = function(){ out.textContent = range.value + d.unit; };
+    range.onchange = commit;
+    inputs[d.k] = range;
+    row.appendChild(lab); row.appendChild(range); row.appendChild(out);
+    wrap.appendChild(row);
+  });
+  function commit(){
+    var parts = [];
+    defs.forEach(function(d){ var v = parseFloat(inputs[d.k].value); if (v !== 0 && !(d.k!=='blur' && d.k!=='grayscale' && v===100)) parts.push(d.k+'('+v+d.unit+')'); });
+    nvSetStyle({ filter: parts.length ? parts.join(' ') : 'none' });
+  }
+  return wrap;
+}
+function nvParseFilter(raw){
+  var out = { blur:0, brightness:100, contrast:100, saturate:100, grayscale:0 };
+  if (!raw || raw === 'none') return out;
+  ['blur','brightness','contrast','saturate','grayscale'].forEach(function(k){
+    var m = new RegExp(k+'\\(([\\d.]+)').exec(raw);
+    if (m) out[k] = parseFloat(m[1]);
+  });
+  return out;
+}
+
+function nvControlTransformBuilder(propDef, disabled){
+  var raw = nvGetStyleVal('transform', 'none');
+  var parsed = nvParseTransform(raw);
+  var wrap = document.createElement('div');
+  wrap.className = 'nv-transform-builder';
+  var defs = [
+    {k:'rotate', label:'Rotate', unit:'deg'},
+    {k:'scale', label:'Scale', unit:''},
+    {k:'translateX', label:'Move X', unit:'px'},
+    {k:'translateY', label:'Move Y', unit:'px'},
+  ];
+  var inputs = {};
+  defs.forEach(function(d){
+    var cell = document.createElement('div'); cell.className = 'nv-transform-cell';
+    var lab = document.createElement('span'); lab.textContent = d.label;
+    var inp = document.createElement('input'); inp.type = 'text'; inp.inputMode='decimal'; inp.value = parsed[d.k];
+    inp.disabled = !!disabled;
+    inp.onchange = commit;
+    inputs[d.k] = inp;
+    cell.appendChild(lab); cell.appendChild(inp);
+    wrap.appendChild(cell);
+  });
+  function commit(){
+    var parts = [];
+    if (parseFloat(inputs.rotate.value)) parts.push('rotate(' + inputs.rotate.value + 'deg)');
+    if (inputs.scale.value && parseFloat(inputs.scale.value) !== 1) parts.push('scale(' + inputs.scale.value + ')');
+    if (parseFloat(inputs.translateX.value) || parseFloat(inputs.translateY.value)) {
+      parts.push('translate(' + (inputs.translateX.value||0) + 'px, ' + (inputs.translateY.value||0) + 'px)');
+    }
+    nvSetStyle({ transform: parts.length ? parts.join(' ') : 'none' });
+  }
+  return wrap;
+}
+function nvParseTransform(raw){
+  var out = { rotate:0, scale:1, translateX:0, translateY:0 };
+  if (!raw || raw === 'none') return out;
+  var r = /rotate\((-?[\d.]+)deg\)/.exec(raw); if (r) out.rotate = parseFloat(r[1]);
+  var s = /scale\((-?[\d.]+)\)/.exec(raw); if (s) out.scale = parseFloat(s[1]);
+  var t = /translate\((-?[\d.]+)px,\s*(-?[\d.]+)px\)/.exec(raw);
+  if (t) { out.translateX = parseFloat(t[1]); out.translateY = parseFloat(t[2]); }
+  return out;
+}
+
+document.getElementById('styles-container').addEventListener('input', function(){});
+
+
+/* =========================================================================
+   IMAGE TARGETING — makes picking/uploading an image actually apply it
+   -------------------------------------------------------------------------
+   Previously, choosing a file (or clicking a library thumbnail) only added
+   it to the Asset Manager's collection. Nothing ever told the currently
+   selected <img> component to use it, so the canvas never updated even
+   though the file picker completed successfully. This tracks the selected
+   image and pushes new/clicked assets onto it directly.
+   ========================================================================= */
+var nvSelectedImageCmp = null;
+var nvPicking = false;
+var nvBgPicking = false;
+
+editor.on('component:selected', function(cmp){
+  nvSelectedImageCmp = (cmp && cmp.get('type') === 'image') ? cmp : null;
+  nvBgPicking = false;
+  if (nvSelectedImageCmp) {
+    nvPicking = true;
+    document.getElementById('library-pick-banner').classList.add('show');
+  } else {
+    nvPicking = false;
+    document.getElementById('library-pick-banner').classList.remove('show');
+  }
+});
+
+function nvGoToPage(pageId){
+  document.querySelectorAll('.page').forEach(function(p){ p.classList.remove('active'); });
+  document.querySelectorAll('.rail-page-btn').forEach(function(b){ b.classList.toggle('active', b.getAttribute('data-page') === pageId); });
+  document.getElementById(pageId).classList.add('active');
+  if (pageId === 'page-library') { nvLoadAssets().then(function(list){ nvAssets = list; nvRenderAssetGrid(); }); }
+  if (pageId === 'page-design') { setTimeout(function(){ try { editor.refresh(); } catch(e){} }, 30); }
+}
+
+document.querySelectorAll('.rail-page-btn').forEach(function(btn){
+  btn.onclick = function(){ nvGoToPage(btn.getAttribute('data-page')); };
+});
+
+document.getElementById('btn-cancel-pick').onclick = function(){
+  document.getElementById('library-pick-banner').classList.remove('show');
+  nvPicking = false;
+  nvBgPicking = false;
+};
+
+function nvApplyAssetToTarget(url){
+  if (!url) return false;
+  if (nvBgPicking) {
+    nvSetStyle({ 'background-image': "url('" + url.replace(/'/g,'%27') + "')" });
+    nvBgPicking = false;
+    document.getElementById('library-pick-banner').classList.remove('show');
+    nvGoToPage('page-design');
+    return true;
+  }
+  if (!nvSelectedImageCmp) return false;
+  nvSelectedImageCmp.set('src', url);
+  nvSelectedImageCmp.addAttributes({ src: url });
+  if (nvPicking) {
+    // Applied from the Media Library page while "picking" — jump back to Design so the result is visible immediately.
+    nvPicking = false;
+    document.getElementById('library-pick-banner').classList.remove('show');
+    nvGoToPage('page-design');
+  }
+  return true;
+}
+
+/* =========================================================================
+   MEDIA LIBRARY — a small self-contained "database" (IndexedDB, via nvDB) for
+   uploaded images, with our own grid UI. We deliberately do NOT rely on
+   GrapesJS's built-in Asset Manager DOM/classes here: those can vary between
+   versions and were the reason picking/uploading an image silently did
+   nothing. This custom grid is simple, inspectable, and guaranteed to work.
+   ========================================================================= */
+var NV_ASSET_DB_KEY = 'nova_builder_assets_v1';
+
+function nvLoadAssets(){
+  return nvDB.get(NV_ASSET_DB_KEY).then(function(v){ return v || nvDefaultAssets(); });
+}
+function nvDefaultAssets(){
+  return [
+    { id:'demo1', src:'https://images.unsplash.com/photo-1506744038136-46273834b3fb?w=500', name:'Demo landscape' },
+    { id:'demo2', src:'https://images.unsplash.com/photo-1519125323398-675f0ddb6308?w=500', name:'Demo sunset' },
+    { id:'demo3', src:'https://images.unsplash.com/photo-1522199755839-a2bacb67c546?w=500', name:'Demo workspace' },
+  ];
+}
+function nvSaveAssets(list){
+  return nvDB.set(NV_ASSET_DB_KEY, list).then(function(){
+    nvAssetStatus('Saved to your image library.', false);
+  }).catch(function(){
+    nvAssetStatus("Image applied, but couldn't be saved for next time.", true);
+  });
+}
+function nvAssetStatus(msg, isWarning){
+  var el = document.getElementById('assets-status');
+  if (!el) return;
+  el.textContent = msg;
+  el.style.color = isWarning ? 'var(--nv-danger)' : 'var(--nv-text-dim)';
+  clearTimeout(nvAssetStatus._t);
+  nvAssetStatus._t = setTimeout(function(){ el.textContent = ''; }, 3500);
+}
+
+var nvAssets = [];
+
+function nvAddAsset(src, name){
+  var asset = { id: 'a_' + Date.now() + '_' + Math.random().toString(36).slice(2, 8), src: src, name: name || 'Upload' };
+  nvAssets.unshift(asset);
+  nvSaveAssets(nvAssets);
+  nvRenderAssetGrid();
+  return asset;
+}
+function nvDeleteAsset(id){
+  nvAssets = nvAssets.filter(function(a){ return a.id !== id; });
+  nvSaveAssets(nvAssets);
+  nvRenderAssetGrid();
+}
+function nvRenderAssetGrid(){
+  var container = document.getElementById('assets-container');
+  if (!container) return;
+  var q = (document.getElementById('assets-search').value || '').toLowerCase().trim();
+  var filtered = nvAssets.filter(function(a){ return !q || (a.name || '').toLowerCase().indexOf(q) > -1; });
+  container.innerHTML = '';
+  if (!filtered.length) {
+    container.innerHTML = '<div class="nv-empty-assets">No images yet. Click "Upload image" to add one.</div>';
+    return;
+  }
+  filtered.forEach(function(a){
+    var card = document.createElement('div');
+    card.className = 'nv-asset-card';
+    var thumb = document.createElement('div');
+    thumb.className = 'nv-asset-thumb';
+    thumb.style.backgroundImage = "url('" + a.src.replace(/'/g, '%27') + "')";
+    thumb.title = nvSelectedImageCmp ? 'Click to apply to selected image' : (a.name || 'Image');
+    thumb.onclick = function(){ nvApplyAssetToTarget(a.src); };
+    var meta = document.createElement('div');
+    meta.className = 'nv-asset-meta';
+    var nameSpan = document.createElement('span');
+    nameSpan.className = 'nv-asset-name';
+    nameSpan.textContent = a.name || 'Image';
+    var delBtn = document.createElement('button');
+    delBtn.className = 'nv-asset-del';
+    delBtn.title = 'Delete';
+    delBtn.innerHTML = '<i class="fa-solid fa-xmark"></i>';
+    delBtn.onclick = function(e){ e.stopPropagation(); nvDeleteAsset(a.id); };
+    meta.appendChild(nameSpan); meta.appendChild(delBtn);
+    card.appendChild(thumb); card.appendChild(meta);
+    container.appendChild(card);
+  });
+}
+
+editor.on('load', function() {
+  try {
+    var sectors = editor.StyleManager.getSectors();
+    sectors.each(function(sec) {
+      sec.on('change:open', function() {
+        if (!sec.get('open')) return;
+        sectors.each(function(other) { if (other !== sec && other.get('open')) other.set('open', false); });
+      });
+    });
+  } catch (err) {}
+
+  var fileInput = document.getElementById('asset-file-input');
+  var uploadBtn = document.getElementById('btn-asset-upload');
+  if (fileInput && uploadBtn) {
+    uploadBtn.onclick = function(){ fileInput.click(); };
+    fileInput.onchange = function(){
+      var files = Array.prototype.slice.call(fileInput.files || []);
+      if (!files.length) return;
+      var applied = false;
+      files.forEach(function(file){
+        if(!file.type || file.type.indexOf('image/') !== 0) return;
+        var reader = new FileReader();
+        reader.onload = function(ev){
+          var asset = nvAddAsset(ev.target.result, file.name);
+          // The first uploaded file is applied straight to whatever image is
+          // currently selected/being picked, so choosing a file actually
+          // shows up on the canvas instead of just landing in the library.
+          if (!applied) { applied = true; nvApplyAssetToTarget(asset.src); }
+        };
+        reader.readAsDataURL(file);
+      });
+      fileInput.value = '';
+    };
+  }
+
+  document.getElementById('assets-search').addEventListener('input', nvRenderAssetGrid);
+  nvRenderAssetGrid();
+
+  document.querySelectorAll('.gs-section-head').forEach(function(head){ head.onclick = function(){ head.parentElement.classList.toggle('collapsed'); }; });
+});
+
+editor.on('component:selected', function(){
+  nvRenderClassManager();
+  nvRenderStyleManager();
+});
+editor.on('component:update:classes selector:add selector:remove', function(){
+  nvRenderStyleManager();
+});
+
+/* =========================================================================
+   TOP BAR ACTIONS
+   ========================================================================= */
+document.getElementById('btn-undo').onclick = function(){ editor.UndoManager.undo(); };
+document.getElementById('btn-redo').onclick = function(){ editor.UndoManager.redo(); };
+document.getElementById('btn-clear').onclick = function(){
+  if(confirm('Clear the entire canvas? This cannot be undone.')){
+    editor.DomComponents.clear(); editor.CssComposer.clear();
+    saveCurrentProjectState();
+  }
+};
+
+document.getElementById('device-select').onchange = function(){
+  editor.setDevice(this.value);
+};
+
+var bordersOn = false;
+document.getElementById('btn-borders').onclick = function(){
+  bordersOn = !bordersOn;
+  editor.runCommand(bordersOn ? 'sw-visibility' : 'sw-visibility');
+  this.classList.toggle('active', bordersOn);
+};
+
+var previewing = false;
+document.getElementById('btn-preview').onclick = function(){
+  previewing = !previewing;
+  var panel = document.getElementById('left-side');
+  if(previewing){
+    editor.runCommand('core:preview');
+    panel.dataset.wasOpen = panel.classList.contains('collapsed') ? '0' : '1';
+    panel.classList.add('collapsed');
+  } else {
+    editor.stopCommand('core:preview');
+    if (panel.dataset.wasOpen === '1') panel.classList.remove('collapsed');
+  }
+  this.classList.toggle('active', previewing);
+};
+
+document.getElementById('btn-fullscreen').onclick = function(){
+  var el = document.documentElement;
+  if(!document.fullscreenElement){ el.requestFullscreen && el.requestFullscreen(); }
+  else { document.exitFullscreen && document.exitFullscreen(); }
+};
+
+/* ---- code modal ---- */
+document.getElementById('btn-code').onclick = function(){
+  document.getElementById('code-html').value = editor.getHtml();
+  document.getElementById('code-css').value = editor.getCss();
+  document.getElementById('code-modal').classList.add('show');
+};
+document.querySelectorAll('.nv-code-tab').forEach(function(tab){
+  tab.onclick = function(){
+    document.querySelectorAll('.nv-code-tab').forEach(function(t){ t.classList.remove('active'); });
+    tab.classList.add('active');
+    var which = tab.getAttribute('data-code');
+    document.getElementById('code-html').style.display = which==='html' ? 'block':'none';
+    document.getElementById('code-css').style.display = which==='css' ? 'block':'none';
+  };
+});
+document.getElementById('btn-copy-code').onclick = function(){
+  var visible = document.getElementById('code-html').style.display !== 'none' ? 'code-html' : 'code-css';
+  var ta = document.getElementById(visible);
+  ta.select(); document.execCommand('copy');
+  this.textContent = 'Copied!';
+  setTimeout(() => { this.textContent = 'Copy'; }, 1400);
+};
+
+/* ---- import modal ---- */
+document.getElementById('btn-import').onclick = function(){
+  document.getElementById('import-textarea').value = '';
+  document.getElementById('import-modal').classList.add('show');
+};
+document.getElementById('btn-do-import').onclick = function(){
+  var val = document.getElementById('import-textarea').value.trim();
+  if(val){ editor.setComponents(val); }
+  closeModal('import-modal');
+  saveCurrentProjectState();
+};
+
+window.closeModal = function(id){ document.getElementById(id).classList.remove('show'); };
+
+/* ---- export full standalone html ---- */
+document.getElementById('btn-export').onclick = function(){
+  var frameworkStyle = globalOverrides.frameworkCss ? '\n<style>\n/* Uploaded framework: '+(globalOverrides.frameworkFileName||'framework.css')+' */\n'+globalOverrides.frameworkCss+'\n</style>\n' : '';
+  var full = '<!DOCTYPE html>\n<html lang="en">\n<head>\n<meta charset="UTF-8">\n<meta name="viewport" content="width=device-width, initial-scale=1.0">\n<title>My Nova Site</title>\n'+
+    '<link href="https://fonts.googleapis.com/css2?family=Sora:wght@400;600;700;800&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">\n'+
+    '<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">\n'+
+    frameworkStyle +
+    '<style>\n'+RUNTIME_CSS+'\n'+buildGlobalOverrideCss()+'\n'+editor.getCss()+'\n</style>\n</head>\n<body>\n'+editor.getHtml()+'\n<script>\n'+RUNTIME_JS+'\n</'+'script>\n</body>\n</html>';
+  var blob = new Blob([full], {type:'text/html'});
+  var url = URL.createObjectURL(blob);
+  var a = document.createElement('a');
+  a.href = url; a.download = 'nova-site.html';
+  document.body.appendChild(a); a.click(); document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+};
+
+/* =========================================================================
+   ICON RAIL & SINGLE SIDE PANEL SWITCHING
+   ========================================================================= */
+document.querySelectorAll('#icon-rail .rail-btn').forEach(function(btn){
+  btn.onclick = function(){
+    var paneId = btn.getAttribute('data-pane');
+    var alreadyActive = btn.classList.contains('active');
+    var onDesignPage = document.getElementById('page-design').classList.contains('active');
+    if (!onDesignPage) { nvGoToPage('page-design'); alreadyActive = false; }
+    var panel = document.getElementById('left-side');
+    document.querySelectorAll('#icon-rail .rail-btn').forEach(function(b){ b.classList.remove('active'); });
+    btn.classList.add('active');
+    document.querySelectorAll('#left-side .side-pane').forEach(function(p){ p.classList.remove('active'); });
+    document.getElementById(paneId).classList.add('active');
+    // Clicking the already-active tab while the panel is open collapses it; otherwise ensure it's open.
+    if (alreadyActive && !panel.classList.contains('collapsed')) {
+      nvClosePanel();
+    } else {
+      nvOpenPanel();
+    }
+  };
+});
+
+/* ---- Draggable panel width: minimum is the current/default width,
+   maximum is min + 40% of min ---- */
+(function(){
+  var panel = document.getElementById('left-side');
+  var handle = document.getElementById('side-resize-handle');
+  var MIN_W = 260;
+  var MAX_W = Math.round(MIN_W * 1.4);
+  var dragging = false, startX = 0, startW = MIN_W;
+
+  handle.addEventListener('mousedown', function(e){
+    dragging = true;
+    startX = e.clientX;
+    startW = panel.getBoundingClientRect().width;
+    panel.classList.add('nv-resizing');
+    document.body.style.userSelect = 'none';
+    e.preventDefault();
+  });
+  document.addEventListener('mousemove', function(e){
+    if (!dragging) return;
+    var next = Math.min(MAX_W, Math.max(MIN_W, startW + (e.clientX - startX)));
+    panel.style.width = next + 'px';
+    panel.style.flexBasis = next + 'px';
+  });
+  document.addEventListener('mouseup', function(){
+    if (!dragging) return;
+    dragging = false;
+    panel.classList.remove('nv-resizing');
+    document.body.style.userSelect = '';
+    try { editor.refresh(); } catch(e){}
+  });
+})();
+
+/* ---- Single panel: pushes the canvas (no overlay). Collapses to give the
+   canvas full width; reopens via the rail, the toolbar burger, or by
+   clicking an element on the canvas. ---- */
+function nvOpenPanel(){
+  document.getElementById('left-side').classList.remove('collapsed');
+  document.getElementById('btn-toggle-panel').classList.add('active');
+}
+function nvClosePanel(){
+  document.getElementById('left-side').classList.add('collapsed');
+  document.getElementById('btn-toggle-panel').classList.remove('active');
+}
+function nvTogglePanel(){
+  var collapsed = document.getElementById('left-side').classList.contains('collapsed');
+  if (collapsed) nvOpenPanel(); else nvClosePanel();
+}
+function nvShowPaneTab(paneId){
+  document.querySelectorAll('#icon-rail .rail-btn').forEach(function(b){ b.classList.toggle('active', b.getAttribute('data-pane') === paneId); });
+  document.querySelectorAll('#left-side .side-pane').forEach(function(p){ p.classList.toggle('active', p.id === paneId); });
+}
+document.getElementById('btn-toggle-panel').onclick = nvTogglePanel;
+document.getElementById('btn-close-left').onclick = nvClosePanel;
+
+/* ---- Blocks subtabs: Widgets / Components / Sections / Library ---- */
+var CAT_MAP = { 
+  Widgets: ['Layout','Basic'], 
+  Components: ['Components'], 
+  Sections: ['Sections'],
+  Library: ['Saved Library']
+};
+var currentBlockCat = 'Widgets';
+var currentSearchTerm = '';
+
+function refreshBlockVisibility(){
+  var allowedCats = CAT_MAP[currentBlockCat] || [];
+  document.querySelectorAll('#blocks-container .gjs-block-category').forEach(function(catEl){
+    var titleEl = catEl.querySelector('.gjs-title');
+    var catName = titleEl ? titleEl.textContent.trim() : '';
+    var catAllowed = allowedCats.indexOf(catName) > -1;
+    var anyVisibleBlock = false;
+    catEl.querySelectorAll('.gjs-block').forEach(function(el){
+      var label = (el.getAttribute('data-label')||el.textContent||'').toLowerCase();
+      var matchesSearch = !currentSearchTerm || label.indexOf(currentSearchTerm) > -1;
+      var show = catAllowed && matchesSearch;
+      el.style.display = show ? '' : 'none';
+      if(show) anyVisibleBlock = true;
+    });
+    catEl.style.display = anyVisibleBlock ? '' : 'none';
+  });
+}
+
+document.querySelectorAll('#blocks-subtabs .side-tab').forEach(function(tab){
+  tab.onclick = function(){
+    document.querySelectorAll('#blocks-subtabs .side-tab').forEach(function(t){ t.classList.remove('active'); });
+    tab.classList.add('active');
+    currentBlockCat = tab.getAttribute('data-blockcat');
+    refreshBlockVisibility();
+  };
+});
+
+document.getElementById('block-search').addEventListener('input', function(e){
+  currentSearchTerm = e.target.value.toLowerCase();
+  refreshBlockVisibility();
+});
+
+editor.on('load', function() {
+  refreshBlockVisibility();
+});
+
+/* =========================================================================
+   RIGHT SIDE PANEL TAB SWITCHING
+   ========================================================================= */
+document.querySelectorAll('.right-tab').forEach(function(tab){
+  tab.onclick = function(){
+    var group = tab.parentElement.parentElement;
+    group.querySelectorAll('.right-tab').forEach(function(t){ t.classList.remove('active'); });
+    group.querySelectorAll('.right-pane').forEach(function(p){ p.classList.remove('active'); });
+    tab.classList.add('active');
+    document.getElementById(tab.getAttribute('data-rpane')).classList.add('active');
+  };
+});
+
+editor.on('component:selected', function(cmp){
+  var nameEl = document.getElementById('style-comp-name');
+  var idEl = document.getElementById('style-comp-id');
+  if(nameEl && cmp){
+    nameEl.textContent = cmp.get('tagName') ? ('<' + cmp.get('tagName') + '>') : 'Component';
+    idEl.textContent = cmp.getId ? cmp.getId() : '';
+  }
+  // Selecting something on canvas opens the panel to the Style tab automatically.
+  if (cmp) { nvShowPaneTab('pane-styles'); nvOpenPanel(); }
+});
+
+document.getElementById('qa-select-parent').onclick = function(){
+  var sel = editor.getSelected();
+  var parent = sel && sel.parent();
+  if(parent) editor.select(parent);
+};
+document.getElementById('qa-duplicate').onclick = function(){
+  var sel = editor.getSelected();
+  if(!sel) return;
+  var clone = sel.clone();
+  sel.parent().append(clone, { at: sel.index() + 1 });
+  saveCurrentProjectState();
+};
+document.getElementById('qa-code').onclick = function(){
+  var sel = editor.getSelected();
+  var html = sel ? sel.toHTML() : editor.getHtml();
+  document.getElementById('code-html').value = html;
+  document.getElementById('code-css').value = editor.getCss();
+  document.querySelectorAll('.nv-code-tab').forEach(function(t){ t.classList.remove('active'); });
+  document.querySelector('.nv-code-tab[data-code="html"]').classList.add('active');
+  document.getElementById('code-html').style.display = 'block';
+  document.getElementById('code-css').style.display = 'none';
+  document.getElementById('code-modal').classList.add('show');
+};
+
+/* =========================================================================
+   GLOBAL OVERRIDES (DESIGN TOKENS)
+   ========================================================================= */
+var defaultGlobalOverrides = {
+  primary:'#6e5bff', secondary:'#22c3a6', accent:'#ffb347',
+  success:'#28a745', warning:'#ffc107', error:'#dc3545',
+  ink:'#1b1d24', font:"'Inter', sans-serif",
+  bodySize:'16px', bodyLh:'1.6',
+  hColor:'#1b1d24', hSize:'1.5rem', hLh:'1.25', hFont:'inherit',
+  shColor:'#6b7280', shSize:'1.2rem', shLh:'1.4', shFont:'inherit',
+  btnBg:'#6e5bff', btnColor:'#ffffff', btnRadius:'10px',
+  linkColor:'#6e5bff', linkDeco:'none',
+  borderRadius:'6px', borderColor:'#e0e0e0',
+  frameworkCss: '', frameworkFileName: ''
+};
+
+var globalOverrides = Object.assign({}, defaultGlobalOverrides);
+
+function buildGlobalOverrideCss(){
+  var g = globalOverrides;
+  return [
+    ':root{',
+    '  --p:'+g.primary+'; --p2:'+g.secondary+'; --accent:'+g.accent+';',
+    '  --success:'+g.success+'; --warning:'+g.warning+'; --error:'+g.error+';',
+    '  --ink:'+g.ink+'; --border:'+g.borderColor+';',
+    '}',
+    'body{ font-family:'+g.font+'; color:'+g.ink+'; font-size:'+g.bodySize+'; line-height:'+g.bodyLh+'; }',
+    'h1,h2,h3,h4,h5,h6{ color:'+g.hColor+'; font-family:'+g.hFont+'; line-height:'+g.hLh+'; }',
+    'h1{ font-size:calc('+g.hSize+' * 1.6); }',
+    'h2{ font-size:calc('+g.hSize+' * 1.25); }',
+    'h3{ font-size:'+g.hSize+'; }',
+    'h4,h5,h6,.nv-subheading{ color:'+g.shColor+'; font-size:'+g.shSize+'; line-height:'+g.shLh+'; font-family:'+g.shFont+'; }',
+    '.nv-btn, a.nv-btn, button.nv-btn{ background:'+g.btnBg+'; color:'+g.btnColor+'; border-radius:'+g.btnRadius+'; }',
+    'a{ color:'+g.linkColor+'; text-decoration:'+g.linkDeco+'; }',
+    'img, .nv-card, input, textarea, select{ border-radius:'+g.borderRadius+'; }',
+  ].join('\n');
+}
+
+function applyGlobalOverrides(){
+  var doc = editor.Canvas.getDocument();
+  if(!doc) return;
+  var styleEl = doc.getElementById('nv-global-overrides');
+  if(!styleEl){
+    styleEl = doc.createElement('style');
+    styleEl.id = 'nv-global-overrides';
+    doc.head.appendChild(styleEl);
+  }
+  styleEl.textContent = buildGlobalOverrideCss();
+}
+
+var nvFrameworkClasses = [];
+function nvParseCssClasses(cssText){
+  var set = {};
+  var re = /\.(-?[_a-zA-Z]+[_a-zA-Z0-9-]*)/g;
+  var m;
+  while ((m = re.exec(cssText))) set[m[1]] = true;
+  return Object.keys(set).sort();
+}
+
+function applyFrameworkStyleSheet(cssText) {
+  nvFrameworkClasses = cssText ? nvParseCssClasses(cssText) : [];
+  var doc = editor.Canvas.getDocument();
+  if(!doc) { nvRenderClassManager(); return; }
+  var styleId = 'nv-framework-stylesheet';
+  var styleEl = doc.getElementById(styleId);
+  if(cssText) {
+    if(!styleEl) {
+      styleEl = doc.createElement('style');
+      styleEl.id = styleId;
+      doc.head.appendChild(styleEl);
+    }
+    styleEl.textContent = cssText;
+  } else if(styleEl) {
+    styleEl.parentNode.removeChild(styleEl);
+  }
+  nvRenderClassManager();
+}
+
+editor.on('load', function() {
+  applyGlobalOverrides();
+  applyFrameworkStyleSheet(globalOverrides.frameworkCss);
+});
+
+/* =========================================================================
+   CUSTOM CLASS MANAGER — search/apply classes from the uploaded framework
+   CSS (or type any custom class), and see what's already applied. Built on
+   the public Component API (getClasses/addClass/removeClass) rather than
+   GrapesJS's internal selector-manager DOM, which is the same class of bug
+   that broke image uploads before: internal view markup can change between
+   versions, the public Component API is stable.
+   ========================================================================= */
+function nvRenderClassManager(){
+  var container = document.getElementById('selectors-container');
+  if (!container) return;
+  var cmp = editor.getSelected();
+  container.innerHTML = '';
+  if (!cmp) { container.innerHTML = '<div class="nv-cls-empty">Select an element to edit its classes.</div>'; return; }
+
+  var classes = (typeof cmp.getClasses === 'function') ? cmp.getClasses() : [];
+
+  var chipsRow = document.createElement('div');
+  chipsRow.className = 'nv-cls-chips';
+  if (classes.length) {
+    classes.forEach(function(cls){
+      var chip = document.createElement('span');
+      chip.className = 'nv-cls-chip';
+      chip.textContent = cls;
+      var x = document.createElement('button');
+      x.type = 'button';
+      x.innerHTML = '<i class="fa-solid fa-xmark"></i>';
+      x.title = 'Remove class';
+      x.onclick = function(){ cmp.removeClass(cls); nvRenderClassManager(); nvRenderStyleManager(); };
+      chip.appendChild(x);
+      chipsRow.appendChild(chip);
+    });
+  } else {
+    var none = document.createElement('span');
+    none.className = 'nv-cls-none';
+    none.textContent = 'No classes on this element yet';
+    chipsRow.appendChild(none);
+  }
+
+  var inputRow = document.createElement('div');
+  inputRow.className = 'nv-cls-input-row';
+  var input = document.createElement('input');
+  input.type = 'text';
+  input.placeholder = nvFrameworkClasses.length ? 'Search classes from your framework…' : 'Type a class name and press Enter…';
+
+  var dropdown = document.createElement('div');
+  dropdown.className = 'nv-cls-dropdown';
+
+  function addClassByName(name){
+    name = (name || '').trim().replace(/\s+/g, '-');
+    if (!name || classes.indexOf(name) > -1) { input.value = ''; dropdown.classList.remove('show'); return; }
+    cmp.addClass(name);
+    nvRenderClassManager();
+    nvRenderStyleManager();
+  }
+
+  input.oninput = function(){
+    var q = input.value.trim().toLowerCase();
+    dropdown.innerHTML = '';
+    if (!q) { dropdown.classList.remove('show'); return; }
+    var matches = nvFrameworkClasses.filter(function(c){
+      return c.toLowerCase().indexOf(q) > -1 && classes.indexOf(c) === -1;
+    }).slice(0, 30);
+    if (!matches.length) { dropdown.classList.remove('show'); return; }
+    matches.forEach(function(c){
+      var item = document.createElement('div');
+      item.className = 'nv-cls-dd-item';
+      item.textContent = c;
+      item.onmousedown = function(e){ e.preventDefault(); addClassByName(c); };
+      dropdown.appendChild(item);
+    });
+    dropdown.classList.add('show');
+  };
+  input.onkeydown = function(e){
+    if (e.key === 'Enter') { e.preventDefault(); addClassByName(input.value); }
+    if (e.key === 'Escape') { dropdown.classList.remove('show'); }
+  };
+  input.onblur = function(){ setTimeout(function(){ dropdown.classList.remove('show'); }, 150); };
+  input.onfocus = function(){ if (input.value.trim()) input.oninput(); };
+
+  inputRow.appendChild(input);
+  container.appendChild(chipsRow);
+  container.appendChild(inputRow);
+  container.appendChild(dropdown);
+
+  if (nvFrameworkClasses.length) {
+    var hint = document.createElement('div');
+    hint.className = 'nv-cls-hint';
+    hint.textContent = nvFrameworkClasses.length + ' classes available from "' + (globalOverrides.frameworkFileName || 'your uploaded CSS') + '".';
+    container.appendChild(hint);
+  }
+}
+
+// Color inputs and text sync
+function bindColorPair(colorId, hexId, key){
+  var c = document.getElementById(colorId);
+  var h = document.getElementById(hexId);
+  if(!c || !h) return;
+  c.oninput = function(){
+    h.value = c.value;
+    globalOverrides[key] = c.value;
+    applyGlobalOverrides();
+    saveCurrentProjectState();
+  };
+  h.onchange = h.oninput = function(){
+    var v = h.value.trim();
+    if(/^#?[0-9a-fA-F]{3,8}$/.test(v)){
+      if(v[0] !== '#') v = '#'+v;
+      c.value = v;
+      globalOverrides[key] = v;
+      applyGlobalOverrides();
+      saveCurrentProjectState();
+    }
+  };
+}
+
+bindColorPair('gs-primary','gs-primary-hex','primary');
+bindColorPair('gs-secondary','gs-secondary-hex','secondary');
+bindColorPair('gs-accent','gs-accent-hex','accent');
+bindColorPair('gs-success','gs-success-hex','success');
+bindColorPair('gs-warning','gs-warning-hex','warning');
+bindColorPair('gs-error','gs-error-hex','error');
+bindColorPair('gs-ink','gs-ink-hex','ink');
+bindColorPair('gs-h-color','gs-h-color-hex','hColor');
+bindColorPair('gs-sh-color','gs-sh-color-hex','shColor');
+bindColorPair('gs-btn-bg','gs-btn-bg-hex','btnBg');
+bindColorPair('gs-btn-color','gs-btn-color-hex','btnColor');
+bindColorPair('gs-link-color','gs-link-color-hex','linkColor');
+bindColorPair('gs-border-color','gs-border-color-hex','borderColor');
+
+document.getElementById('gs-font').onchange = function(){ globalOverrides.font = this.value; applyGlobalOverrides(); saveCurrentProjectState(); };
+document.getElementById('gs-body-size').oninput = function(){ globalOverrides.bodySize = this.value + 'px'; applyGlobalOverrides(); saveCurrentProjectState(); };
+document.getElementById('gs-body-lh').oninput = function(){ globalOverrides.bodyLh = String(this.value); applyGlobalOverrides(); saveCurrentProjectState(); };
+document.getElementById('gs-h-size').oninput = function(){ globalOverrides.hSize = this.value + 'rem'; applyGlobalOverrides(); saveCurrentProjectState(); };
+document.getElementById('gs-h-lh').oninput = function(){ globalOverrides.hLh = String(this.value); applyGlobalOverrides(); saveCurrentProjectState(); };
+document.getElementById('gs-h-font').onchange = function(){ globalOverrides.hFont = this.value; applyGlobalOverrides(); saveCurrentProjectState(); };
+document.getElementById('gs-sh-size').oninput = function(){ globalOverrides.shSize = this.value + 'rem'; applyGlobalOverrides(); saveCurrentProjectState(); };
+document.getElementById('gs-sh-lh').oninput = function(){ globalOverrides.shLh = String(this.value); applyGlobalOverrides(); saveCurrentProjectState(); };
+document.getElementById('gs-sh-font').onchange = function(){ globalOverrides.shFont = this.value; applyGlobalOverrides(); saveCurrentProjectState(); };
+document.getElementById('gs-btn-radius').onchange = function(){ globalOverrides.btnRadius = this.value; applyGlobalOverrides(); saveCurrentProjectState(); };
+document.getElementById('gs-border-radius').onchange = function(){ globalOverrides.borderRadius = this.value; applyGlobalOverrides(); saveCurrentProjectState(); };
+
+document.getElementById('gs-link-none').onclick = function(){
+  globalOverrides.linkDeco = 'none';
+  this.classList.add('active');
+  document.getElementById('gs-link-underline').classList.remove('active');
+  applyGlobalOverrides();
+  saveCurrentProjectState();
+};
+document.getElementById('gs-link-underline').onclick = function(){
+  globalOverrides.linkDeco = 'underline';
+  this.classList.add('active');
+  document.getElementById('gs-link-none').classList.remove('active');
+  applyGlobalOverrides();
+  saveCurrentProjectState();
+};
+
+document.getElementById('btn-framework-upload').onclick = function(){
+  document.getElementById('gs-framework-file').click();
+};
+document.getElementById('gs-framework-file').onchange = function(){
+  var file = this.files && this.files[0];
+  this.value = '';
+  if (!file) return;
+  var statusEl = document.getElementById('gs-framework-status');
+  var reader = new FileReader();
+  reader.onload = function(ev){
+    var cssText = ev.target.result;
+    globalOverrides.frameworkCss = cssText;
+    globalOverrides.frameworkFileName = file.name;
+    applyFrameworkStyleSheet(cssText);
+    statusEl.textContent = '"' + file.name + '" loaded — ' + nvFrameworkClasses.length + ' classes found.';
+    saveCurrentProjectState();
+  };
+  reader.onerror = function(){
+    statusEl.textContent = "Couldn't read that file.";
+  };
+  reader.readAsText(file);
+};
+
+/* =========================================================================
+   PROJECT MANAGER (IndexedDB-backed — see nvDB above)
+   ========================================================================= */
+var projects = [];
+var currentProjectId = 'default-project';
+
+async function initProjectManager() {
+  var storedList = await nvDB.get('nova-projects-list');
+  projects = storedList || [];
+
+  if (projects.length === 0) {
+    projects = [
+      { id: 'default-project', name: 'Default Site', updatedAt: new Date().toISOString() }
+    ];
+    await nvDB.set('nova-projects-list', projects);
+  }
+
+  var storedCurrentId = await nvDB.get('nova-current-project-id');
+  if (storedCurrentId && projects.some(function(p){ return p.id === storedCurrentId; })) {
+    currentProjectId = storedCurrentId;
+  } else {
+    currentProjectId = projects[0].id;
+    await nvDB.set('nova-current-project-id', currentProjectId);
+  }
+
+  refreshProjectSelectDropdown();
+
+  document.getElementById('project-select').onchange = function() {
+    switchProject(this.value);
+  };
+
+  document.getElementById('btn-new-project').onclick = function() {
+    var name = prompt('Enter new project name:');
+    if (name && name.trim()) {
+      createNewProject(name.trim());
+    }
+  };
+
+  document.getElementById('btn-delete-project').onclick = function() {
+    if (projects.length <= 1) {
+      alert('You must keep at least one project.');
+      return;
+    }
+    if (confirm('Are you sure you want to delete the current project? This cannot be undone.')) {
+      deleteCurrentProject();
+    }
+  };
+
+  document.getElementById('btn-backup-projects').onclick = function() {
+    exportAllProjects();
+  };
+
+  document.getElementById('btn-restore-projects').onclick = function() {
+    document.getElementById('restore-file-input').click();
+  };
+
+  document.getElementById('restore-file-input').onchange = function(e) {
+    var file = e.target.files[0];
+    if (!file) return;
+    var reader = new FileReader();
+    reader.onload = function(evt) {
+      importAllProjects(evt.target.result);
+    };
+    reader.readAsText(file);
+    this.value = '';
+  };
+
+  // Autosave configuration
+  editor.on('component:update style:update component:add component:remove selector:add selector:update selector:remove class:add class:remove class:state', function() {
+    document.getElementById('save-status').textContent = 'Editing…';
+    // Debounce save state
+    if (window.saveTimeout) clearTimeout(window.saveTimeout);
+    window.saveTimeout = setTimeout(function() {
+      saveCurrentProjectState();
+      document.getElementById('save-status').textContent = 'Saved';
+    }, 800);
+  });
+}
+
+function refreshProjectSelectDropdown() {
+  var select = document.getElementById('project-select');
+  select.innerHTML = '';
+  projects.forEach(function(p) {
+    var opt = document.createElement('option');
+    opt.value = p.id;
+    opt.textContent = p.name;
+    if (p.id === currentProjectId) {
+      opt.selected = true;
+    }
+    select.appendChild(opt);
+  });
+}
+
+async function saveCurrentProjectState() {
+  if (!editor) return;
+  var gjsData = editor.getProjectData();
+  var state = {
+    gjs: gjsData,
+    globalOverrides: globalOverrides
+  };
+
+  await nvDB.set('nova-project-data-' + currentProjectId, state);
+
+  var proj = projects.find(function(p){ return p.id === currentProjectId; });
+  if (proj) {
+    proj.updatedAt = new Date().toISOString();
+    await nvDB.set('nova-projects-list', projects);
+  }
+}
+
+async function loadProjectState(id) {
+  var state = await nvDB.get('nova-project-data-' + id);
+  if (state) {
+    try {
+      if (state.gjs) {
+        editor.loadProjectData(state.gjs);
+      } else {
+        editor.DomComponents.clear();
+        editor.CssComposer.clear();
+      }
+
+      if (state.globalOverrides) {
+        globalOverrides = Object.assign({}, defaultGlobalOverrides, state.globalOverrides);
+      } else {
+        globalOverrides = Object.assign({}, defaultGlobalOverrides);
+      }
+    } catch(e) {
+      console.error('Failed to load project data for ' + id, e);
+    }
+  } else {
+    editor.DomComponents.clear();
+    editor.CssComposer.clear();
+    editor.setComponents(
+      '<div class="nv-navbar"><a href="#" class="brand"><i class="fa-solid fa-cube"></i> Nova</a><nav><a href="#">Product</a><a href="#">Pricing</a><a href="#">About</a></nav><div style="display:flex;gap:12px;"><button class="nv-btn outline">Log in</button><button class="nv-btn">Sign up</button></div></div>'+
+      '<section class="nv-hero"><h1>Build beautiful pages, faster</h1><p>Drag widgets from the left panel, style them on the right, and export production-ready code.</p><button class="nv-btn rounded">Get started free</button></section>'
+    );
+    globalOverrides = Object.assign({}, defaultGlobalOverrides);
+  }
+
+  updateGlobalStylesInputsUI();
+  applyGlobalOverrides();
+  applyFrameworkStyleSheet(globalOverrides.frameworkCss);
+}
+
+async function switchProject(id) {
+  await saveCurrentProjectState();
+  currentProjectId = id;
+  await nvDB.set('nova-current-project-id', id);
+  await loadProjectState(id);
+  refreshProjectSelectDropdown();
+}
+
+async function createNewProject(name) {
+  await saveCurrentProjectState();
+  var newId = 'proj-' + Date.now();
+  projects.push({
+    id: newId,
+    name: name,
+    updatedAt: new Date().toISOString()
+  });
+
+  await nvDB.set('nova-projects-list', projects);
+  currentProjectId = newId;
+  await nvDB.set('nova-current-project-id', newId);
+
+  editor.DomComponents.clear();
+  editor.CssComposer.clear();
+  editor.setComponents(
+    '<div class="nv-navbar"><a href="#" class="brand"><i class="fa-solid fa-cube"></i> ' + name + '</a><nav><a href="#">Home</a><a href="#">About</a><a href="#">Contact</a></nav><div style="display:flex;gap:12px;"><button class="nv-btn">Get Started</button></div></div>'+
+    '<section class="nv-hero"><h1>Welcome to ' + name + '</h1><p>Start building your custom project layout here.</p><button class="nv-btn rounded">Edit page</button></section>'
+  );
+
+  globalOverrides = Object.assign({}, defaultGlobalOverrides);
+
+  updateGlobalStylesInputsUI();
+  applyGlobalOverrides();
+  applyFrameworkStyleSheet('');
+
+  await saveCurrentProjectState();
+  refreshProjectSelectDropdown();
+}
+
+async function deleteCurrentProject() {
+  var index = projects.findIndex(function(p){ return p.id === currentProjectId; });
+  if (index > -1) {
+    projects.splice(index, 1);
+    await nvDB.set('nova-projects-list', projects);
+    await nvDB.remove('nova-project-data-' + currentProjectId);
+
+    currentProjectId = projects[0].id;
+    await nvDB.set('nova-current-project-id', currentProjectId);
+    await loadProjectState(currentProjectId);
+    refreshProjectSelectDropdown();
+  }
+}
+
+async function exportAllProjects() {
+  var data = {
+    projectsList: projects,
+    projectsData: {}
+  };
+
+  for (var i = 0; i < projects.length; i++) {
+    var p = projects[i];
+    var stored = await nvDB.get('nova-project-data-' + p.id);
+    if (stored) data.projectsData[p.id] = stored;
+  }
+
+  var blob = new Blob([JSON.stringify(data, null, 2)], {type: 'application/json'});
+  var url = URL.createObjectURL(blob);
+  var a = document.createElement('a');
+  a.href = url;
+  a.download = 'nova-builder-database.json';
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+}
+
+async function importAllProjects(jsonStr) {
+  try {
+    var data = JSON.parse(jsonStr);
+    if (!data.projectsList || !data.projectsData) {
+      alert('Invalid backup file structure.');
+      return;
+    }
+
+    if (confirm('Importing will merge with or overwrite projects with matching IDs. Proceed?')) {
+      for (var i = 0; i < data.projectsList.length; i++) {
+        var p = data.projectsList[i];
+        if (!projects.some(function(existing){ return existing.id === p.id; })) {
+          projects.push(p);
+        } else {
+          var index = projects.findIndex(function(existing){ return existing.id === p.id; });
+          projects[index] = p;
+        }
+        var pData = data.projectsData[p.id];
+        if (pData) {
+          await nvDB.set('nova-project-data-' + p.id, pData);
+        }
+      }
+
+      await nvDB.set('nova-projects-list', projects);
+      refreshProjectSelectDropdown();
+      await switchProject(projects[0].id);
+      alert('Projects imported successfully!');
+    }
+  } catch(e) {
+    alert('Failed to parse backup JSON file.');
+  }
+}
+
+function updateGlobalStylesInputsUI() {
+  var g = globalOverrides;
+  updateInputVal('gs-primary', g.primary);
+  updateInputVal('gs-primary-hex', g.primary);
+  updateInputVal('gs-secondary', g.secondary);
+  updateInputVal('gs-secondary-hex', g.secondary);
+  updateInputVal('gs-accent', g.accent);
+  updateInputVal('gs-accent-hex', g.accent);
+  updateInputVal('gs-success', g.success);
+  updateInputVal('gs-success-hex', g.success);
+  updateInputVal('gs-warning', g.warning);
+  updateInputVal('gs-warning-hex', g.warning);
+  updateInputVal('gs-error', g.error);
+  updateInputVal('gs-error-hex', g.error);
+  updateInputVal('gs-ink', g.ink);
+  updateInputVal('gs-ink-hex', g.ink);
+  updateInputVal('gs-font', g.font);
+  updateInputVal('gs-body-size', parseInt(g.bodySize, 10) || 16);
+  updateInputVal('gs-body-lh', parseFloat(g.bodyLh) || 1.6);
+  updateInputVal('gs-h-color', g.hColor);
+  updateInputVal('gs-h-color-hex', g.hColor);
+  updateInputVal('gs-h-size', parseFloat(g.hSize) || 1.5);
+  updateInputVal('gs-h-lh', parseFloat(g.hLh) || 1.25);
+  updateInputVal('gs-h-font', g.hFont);
+  updateInputVal('gs-sh-color', g.shColor);
+  updateInputVal('gs-sh-color-hex', g.shColor);
+  updateInputVal('gs-sh-size', parseFloat(g.shSize) || 1.2);
+  updateInputVal('gs-sh-lh', parseFloat(g.shLh) || 1.4);
+  updateInputVal('gs-sh-font', g.shFont);
+  updateInputVal('gs-btn-bg', g.btnBg);
+  updateInputVal('gs-btn-bg-hex', g.btnBg);
+  updateInputVal('gs-btn-color', g.btnColor);
+  updateInputVal('gs-btn-color-hex', g.btnColor);
+  updateInputVal('gs-btn-radius', g.btnRadius);
+  updateInputVal('gs-link-color', g.linkColor);
+  updateInputVal('gs-link-color-hex', g.linkColor);
+
+  var noneBtn = document.getElementById('gs-link-none');
+  var underlineBtn = document.getElementById('gs-link-underline');
+  if (noneBtn && underlineBtn) {
+    if (g.linkDeco === 'none') { noneBtn.classList.add('active'); underlineBtn.classList.remove('active'); }
+    else { noneBtn.classList.remove('active'); underlineBtn.classList.add('active'); }
+  }
+  updateInputVal('gs-border-radius', g.borderRadius);
+  updateInputVal('gs-border-color', g.borderColor);
+  updateInputVal('gs-border-color-hex', g.borderColor);
+  var fwStatus = document.getElementById('gs-framework-status');
+  if (fwStatus) {
+    fwStatus.textContent = g.frameworkCss
+      ? '"' + (g.frameworkFileName || 'framework.css') + '" loaded — ' + nvFrameworkClasses.length + ' classes found.'
+      : '';
+  }
+}
+
+function updateInputVal(id, val) {
+  var el = document.getElementById(id);
+  if (el) el.value = val || '';
+}
+
+/* =========================================================================
+   SAVED LIBRARY COMPONENT REUSE
+   ========================================================================= */
+var libraryBlocks = [];
+
+async function initSavedLibrary() {
+  var savedList = await nvDB.get('nova-saved-library');
+  libraryBlocks = savedList || [];
+
+  libraryBlocks.forEach(function(b) {
+    editor.BlockManager.add(b.id, {
+      label: '<i class="fa-regular fa-star" style="color:var(--nv-accent-2);"></i><div class="gjs-block-label">' + b.name + '</div>',
+      category: 'Saved Library',
+      content: b.content,
+      attributes: { 'data-label': b.name.toLowerCase() }
+    });
+  });
+
+  var saveBtn = document.getElementById('qa-save-library');
+  if (saveBtn) {
+    saveBtn.onclick = async function() {
+      var cmp = editor.getSelected();
+      if (!cmp) {
+        alert('Please select a component or section on the canvas first.');
+        return;
+      }
+
+      var name = prompt('Enter a name for this library component:');
+      if (!name || !name.trim()) return;
+      name = name.trim();
+
+      var id = 'lib-' + Date.now();
+      var html = cmp.toHTML();
+      var css = editor.CodeManager.getGenerator('css').build(cmp);
+      var content = html + '<style>' + css + '</style>';
+
+      libraryBlocks.push({
+        id: id,
+        name: name,
+        content: content
+      });
+
+      await nvDB.set('nova-saved-library', libraryBlocks);
+
+      editor.BlockManager.add(id, {
+        label: '<i class="fa-regular fa-star" style="color:var(--nv-accent-2);"></i><div class="gjs-block-label">' + name + '</div>',
+        category: 'Saved Library',
+        content: content,
+        attributes: { 'data-label': name.toLowerCase() }
+      });
+
+      // Select the Library subtab to show it instantly
+      document.querySelector('#blocks-subtabs .side-tab[data-blockcat="Library"]').click();
+
+      setTimeout(refreshBlockVisibility, 40);
+      alert('Component saved to Library successfully! You can reuse it across any project.');
+    };
+  }
+}
+
+/* =========================================================================
+   APPLICATION ENTRY POINT
+   ========================================================================= */
+editor.on('load', async function() {
+  await nvMigrateFromLocalStorage();
+  await initProjectManager();
+  await initSavedLibrary();
+  await loadProjectState(currentProjectId);
+  setTimeout(refreshBlockVisibility, 200);
+});
+
+
+})();
+</script>
+</body>
+</html>
