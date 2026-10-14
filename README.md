@@ -63,5 +63,5 @@ cd [repo-name]
 
 ## Author
 
-**Moila Leatile Onthatile**, BSc Information Technology
+**Moila Leatile Onthatile**
 GitHub: [@onthatile77](https://github.com/onthatile77) | Email: onthatile.0318@gmail.com
