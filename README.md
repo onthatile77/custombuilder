@@ -18,7 +18,6 @@ I used AI tools to speed up development and directed the build myself, reviewing
 - [Export or save: HTML/CSS export, local save, etc.]
 - [Any custom behaviour beyond the GrapesJS defaults]
 
-> Edit this list to match what your builder actually does.
 
 ## Tech stack
 
